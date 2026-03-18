@@ -485,7 +485,7 @@ function addEx(type){wEx.push({name:'',type:type,sets:[{w:'',r:''}]});renderExs(
 function remEx(i){wEx.splice(i,1);renderExs();}
 function addSet(i){wEx[i].sets.push({w:'',r:''});renderExs();}
 function remSet(i,j){if(wEx[i].sets.length>1){wEx[i].sets.splice(j,1);renderExs();}}
-function saveWorkout(isEdit){
+function saveWorkout(){
   var name=document.getElementById('wn').value.trim();
   var date=document.getElementById('wd').value;
   var dur=Number(document.getElementById('wt').value)||45;
@@ -496,8 +496,7 @@ function saveWorkout(isEdit){
   }).filter(function(e){return e.type==='cardio'||(e.sets&&e.sets.length);});
   if(!exercises.length){alert('Please add at least one exercise');return;}
   var W=DB.get('workouts')||[];
-  var editing=(isEdit===true||isEdit==='true')&&editCtx.id;
-  if(editing){
+  if(editCtx.id){
     W=W.map(function(w){return w.id===editCtx.id?{id:w.id,date:date,name:name,duration:dur,exercises:exercises}:w;});
   }else{
     W.unshift({id:gid(),date:date,name:name,duration:dur,exercises:exercises});
