@@ -232,7 +232,7 @@ var fmtDL=function(d){if(!d)return'';return new Date(d+'T00:00:00').toLocaleDate
 var greet=function(){var h=new Date().getHours();return h<12?'morning':h<17?'afternoon':'evening';};
 var skm=function(s){return(s*0.000762).toFixed(1);};
 var scal=function(s){return Math.round(s*0.04);};
-var tvol=function(ex){return ex.sets.reduce(function(t,s){return t+(s.w||0)*s.r;},0);};
+var tvol=function(ex){if(!ex.sets)return 0;return ex.sets.reduce(function(t,s){return t+(s.w||0)*s.r;},0);};
 var calcCals=function(p,c,f){return Math.round((p||0)*4+(c||0)*4+(f||0)*9);};
 var curPage='home';
 var expW=null;
@@ -447,7 +447,15 @@ function openWorkoutModal(){
 function renderWModal(name,date,dur,isEdit){
   var b=document.getElementById('mb-workout');
   var saveLabel=isEdit?'Save Changes':'Save Workout';
-  b.innerHTML='<div class="field"><label class="lbl">Workout Name</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+( name||'')+'"/></div><div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div><div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label><div style="display:flex;gap:8px"><button class="btn-sm" onclick="addEx(&quot;strength&quot;)">+ Strength</button><button class="btn-sm" onclick="addEx(&quot;cardio&quot;)">+ Cardio</button></div></div><div id="wexs"></div><button class="btn-primary" onclick="saveWorkout()">'+saveLabel+'</button>';
+  var html='';
+  html+='<div class="field"><label class="lbl">Workout Name</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+(name||'')+'"/></div>';
+  html+='<div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div>';
+  html+='<div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label>';
+  html+='<div style="display:flex;gap:8px"><button class="btn-sm" onclick="addEx('strength')">+ Strength</button><button class="btn-sm" onclick="addEx('cardio')">+ Cardio</button></div></div>';
+  html+='<div id="wexs"></div>';
+  html+='<button class="btn-primary" onclick="saveWorkout()">'+saveLabel+'</button>';
+  b.innerHTML=html;
   renderExs();
 }
 
@@ -496,6 +504,7 @@ function saveWorkout(){
   }).filter(function(e){return e.type==='cardio'||(e.sets&&e.sets.length);});
   if(!exercises.length){alert('Please add at least one exercise');return;}
   var W=DB.get('workouts')||[];
+  alert('DEBUG: exercises='+exercises.length+' editCtx.id='+editCtx.id+' W before='+W.length);
   if(editCtx.id){
     W=W.map(function(w){return w.id===editCtx.id?{id:w.id,date:date,name:name,duration:dur,exercises:exercises}:w;});
   }else{
