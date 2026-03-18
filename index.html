@@ -447,12 +447,13 @@ function openWorkoutModal(){
 function renderWModal(name,date,dur,isEdit){
   var b=document.getElementById('mb-workout');
   var saveLabel=isEdit?'Save Changes':'Save Workout';
+  var strBtn='<button class="btn-sm" onclick="addEx(\u0027strength\u0027)">+ Strength</button>';
+  var carBtn='<button class="btn-sm" onclick="addEx(\u0027cardio\u0027)">+ Cardio</button>';
   var html='';
   html+='<div class="field"><label class="lbl">Workout Name</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+(name||'')+'"/></div>';
   html+='<div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div>';
   html+='<div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div>';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label>';
-  html+='<div style="display:flex;gap:8px"><button class="btn-sm" onclick="addEx('strength')">+ Strength</button><button class="btn-sm" onclick="addEx('cardio')">+ Cardio</button></div></div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label><div style="display:flex;gap:8px">'+strBtn+carBtn+'</div></div>';
   html+='<div id="wexs"></div>';
   html+='<button class="btn-primary" onclick="saveWorkout()">'+saveLabel+'</button>';
   b.innerHTML=html;
