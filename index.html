@@ -1,24 +1,1557 @@
 <!DOCTYPE html>
+
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#FF6B35" />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" href="/icon-192.svg" type="image/svg+xml" />
-    <title>Lawton Fitness</title>
-  </head>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Lawton Fitness"/>
+  <meta name="theme-color" content="#FF6B35"/>
+  <title>Lawton Fitness</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.svg"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body,#root{height:100%;width:100%}
+    body{background:#0a0a0f;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+    #root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+    #splash{position:fixed;inset:0;background:#0a0a0f;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:20px;z-index:9999;transition:opacity 0.5s}
+    #splash.fade{opacity:0;pointer-events:none}
+    #splash-logo{animation:pulse 1.8s ease-in-out infinite}
+    #splash-text{color:#FF6B35;font-family:system-ui,sans-serif;font-size:12px;
+      letter-spacing:4px;opacity:0.7;margin-top:4px}
+    #splash-status{color:#555;font-family:system-ui,sans-serif;font-size:11px;
+      letter-spacing:2px;margin-top:2px}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.96)}}
+  </style>
+</head>
+<body>
+  <div id="splash">
+    <svg id="splash-logo" width="80" height="80" viewBox="0 0 80 80" fill="none">
+      <polygon points="40,4 76,24 76,56 40,76 4,56 4,24" fill="#FF6B35" opacity="0.12"/>
+      <polygon points="40,4 76,24 76,56 40,76 4,56 4,24" fill="none" stroke="#FF6B35" stroke-width="2"/>
+      <polygon points="40,14 66,29 66,51 40,66 14,51 14,29" fill="#FF6B35" opacity="0.18"/>
+      <polygon points="40,22 58,33 58,47 40,58 22,47 22,33" fill="#FF6B35" opacity="0.25"/>
+      <text x="40" y="51" text-anchor="middle" fill="#FF6B35" font-size="26" font-weight="900" font-family="Arial,sans-serif" letter-spacing="-2">LF</text>
+    </svg>
+    <div id="splash-text">LAWTON FITNESS</div>
+    <div id="splash-status">Loading...</div>
+  </div>
+  <div id="root"></div>
 
-  <body>
-    <noscript>You need JavaScript enabled to run Lawton Fitness.</noscript>
-    <div id="root"></div>
+  <script>
+    function setStatus(msg){ var el=document.getElementById('splash-status'); if(el) el.textContent=msg; }
+    function hideSplash(){ 
+      var s=document.getElementById('splash');
+      if(s){s.classList.add('fade');setTimeout(function(){s.remove()},500);}
+    }
+    function showError(msg){
+      var s=document.getElementById('splash-status');
+      if(s){s.style.color='#ff6b6b';s.textContent=msg;}
+    }
+    
+    // Load a script dynamically and return a promise
+    function loadScript(src){
+      return new Promise(function(resolve,reject){
+        var s=document.createElement('script');
+        s.src=src;
+        s.onload=resolve;
+        s.onerror=function(){ reject(new Error('Failed to load: '+src)); };
+        document.head.appendChild(s);
+      });
+    }
+    
+    // CDN URLs with fallbacks
+    var REACT_URL = 'https://unpkg.com/react@18/umd/react.production.min.js';
+    var REACTDOM_URL = 'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js';
+    var BABEL_URL = 'https://unpkg.com/@babel/standalone@7.23.6/babel.min.js';
+    
+    // Fallback CDNs
+    var REACT_FB = 'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js';
+    var REACTDOM_FB = 'https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js';
+    var BABEL_FB = 'https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.6/babel.min.js';
 
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js');
+    function loadWithFallback(primary, fallback){
+      return loadScript(primary).catch(function(){
+        console.warn('Primary CDN failed, trying fallback...');
+        return loadScript(fallback);
+      });
+    }
+
+    async function bootApp(){
+      try {
+        setStatus('Loading React...');
+        await loadWithFallback(REACT_URL, REACT_FB);
+        
+        setStatus('Loading renderer...');
+        await loadWithFallback(REACTDOM_URL, REACTDOM_FB);
+        
+        setStatus('Loading compiler...');
+        await loadWithFallback(BABEL_URL, BABEL_FB);
+        
+        setStatus('Starting app...');
+        
+        // Get the JSX source
+        var jsxSrc = document.getElementById('app-source').textContent;
+        
+        // Transform JSX to JS using Babel
+        var transformed = Babel.transform(jsxSrc, {
+          presets: ['react'],
+          filename: 'app.jsx'
+        }).code;
+        
+        // Execute the transformed code
+        var fn = new Function('React', 'ReactDOM', transformed + '\nreturn LawtonFitness;');
+        var AppComponent = fn(React, ReactDOM);
+        
+        // Mount
+        var root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(AppComponent));
+        
+        // Hide splash after first render
+        requestAnimationFrame(function(){
+          setTimeout(hideSplash, 200);
         });
+        
+      } catch(err) {
+        console.error('Boot failed:', err);
+        showError('Error: ' + err.message);
       }
-    </script>
-  </body>
+    }
+    
+    // Start loading when DOM is ready
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', bootApp);
+    } else {
+      bootApp();
+    }
+  </script>
+
+  <!-- App JSX source stored in a non-executed script tag -->
+
+  <script type="text/app-source" id="app-source">
+// Lawton Fitness PWA
+const { useState, useEffect, useRef } = React;
+
+
+// ─── Storage ──────────────────────────────────────────────────────────────────
+async function load(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } }
+async function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.error(e); } }
+
+const OWNER_PIN = "1234"; // Lawton's PIN — change this
+const KEYS = {
+  clients: "lf:clients",
+  ownerData: "lf:ownerData",
+  checkins: (id) => `lf:checkins:${id}`,
+  workouts: (id) => `lf:workouts:${id}`,
+  nutrition: (id) => `lf:nutrition:${id}`,
+  steps: (id) => `lf:steps:${id}`,
+  supplements: (id) => `lf:supplements:${id}`,
+  goals: (id) => `lf:goals:${id}`,
+  plans: (id) => `lf:plans:${id}`,
+};
+
+// ─── Seed Clients ─────────────────────────────────────────────────────────────
+const SEED_CLIENTS = [
+  { id: "c1", name: "Jamie Clarke", pin: "1111", email: "jamie@email.com", joined: "2026-01-15", goal: "Build muscle & strength", status: "active", avatar: "JC" },
+  { id: "c2", name: "Sarah Patel", pin: "2222", email: "sarah@email.com", joined: "2026-02-01", goal: "Weight loss & toning", status: "active", avatar: "SP" },
+  { id: "c3", name: "Marcus Lee", pin: "3333", email: "marcus@email.com", joined: "2026-03-01", goal: "Athletic performance", status: "active", avatar: "ML" },
+];
+
+const SEED_OWNER_DATA = {
+  workouts: [
+    { id: 1, date: "2026-03-14", name: "Pull Day", duration: 50, exercises: [{ name: "Deadlift", sets: [{w:120,r:5},{w:135,r:3}] }, { name: "Barbell Row", sets: [{w:70,r:8},{w:80,r:6}] }] },
+    { id: 2, date: "2026-03-16", name: "Upper Body", duration: 58, exercises: [{ name: "Bench Press", sets: [{w:82,r:8},{w:92,r:5}] }, { name: "Pull-Ups", sets: [{w:0,r:11},{w:5,r:8}] }] },
+  ],
+  nutrition: [
+    { id: 1, date: "2026-03-16", calories: 2450, protein: 185, carbs: 260, fat: 72, meals: [{ name: "Breakfast", items: ["Oats","Protein shake"] }, { name: "Lunch", items: ["Chicken 200g","Rice"] }] },
+  ],
+  steps: [
+    { id: 1, date: "2026-03-16", steps: 9240, goal: 10000 },
+    { id: 2, date: "2026-03-15", steps: 11350, goal: 10000 },
+  ],
+  supplements: [
+    { id: 1, name: "Creatine", dose: "5g", timing: "Post-workout", color: "#4ecdc4", active: true },
+    { id: 2, name: "Whey Protein", dose: "30g", timing: "Post-workout", color: "#FF6B35", active: true },
+  ],
+  goals: [
+    { id: 1, name: "Bench Press 100kg", target: 100, current: 92, unit: "kg", category: "strength", deadline: "2026-06-01" },
+    { id: 2, name: "Deadlift 160kg", target: 160, current: 135, unit: "kg", category: "strength", deadline: "2026-08-01" },
+  ],
+};
+
+const SEED_CLIENT_DATA = {
+  c1: {
+    workouts: [{ id: 1, date: "2026-03-15", name: "Chest & Triceps", duration: 48, exercises: [{ name: "Bench Press", sets: [{w:60,r:8},{w:65,r:6}] }, { name: "Tricep Dips", sets: [{w:0,r:12},{w:0,r:10}] }] }],
+    nutrition: [{ id: 1, date: "2026-03-16", calories: 2100, protein: 155, carbs: 220, fat: 60, meals: [{ name: "Breakfast", items: ["Eggs x3","Toast"] }, { name: "Lunch", items: ["Tuna wrap"] }] }],
+    steps: [{ id: 1, date: "2026-03-16", steps: 8400, goal: 8000 }, { id: 2, date: "2026-03-15", steps: 6200, goal: 8000 }],
+    supplements: [{ id: 1, name: "Whey Protein", dose: "25g", timing: "Post-workout", color: "#FF6B35", active: true }],
+    goals: [{ id: 1, name: "Bench Press 80kg", target: 80, current: 65, unit: "kg", category: "strength", deadline: "2026-06-01" }, { id: 2, name: "Lose 5kg", target: 5, current: 2, unit: "kg", category: "body", deadline: "2026-05-01" }],
+    checkins: [{ id: 1, date: "2026-03-17", type: "weekly", mood: 4, energy: 3, weight: 82.5, compliance: "3/4 workouts", notes: "Feeling stronger, sleep still an issue", measurements: { chest: 98, waist: 86, hips: 100 } }, { id: 2, date: "2026-03-10", type: "weekly", mood: 3, energy: 3, weight: 83.1, compliance: "2/4 workouts", notes: "Busy week at work, missed a couple sessions", measurements: { chest: 98, waist: 87, hips: 101 } }],
+    plan: { training: "4x per week — Push/Pull/Legs/Upper. Focus on progressive overload on compound lifts.", nutrition: "2100 kcal target. 155g protein daily. Carb cycling on training vs rest days.", notes: "Great attitude. Push him on consistency. Consider adding AM cardio on rest days." },
+  },
+  c2: {
+    workouts: [{ id: 1, date: "2026-03-14", name: "Full Body", duration: 40, exercises: [{ name: "Squat", sets: [{w:40,r:12},{w:45,r:10}] }, { name: "Dumbbell Row", sets: [{w:14,r:12},{w:16,r:10}] }] }],
+    nutrition: [{ id: 1, date: "2026-03-16", calories: 1650, protein: 120, carbs: 175, fat: 52, meals: [{ name: "Breakfast", items: ["Greek yogurt","Berries"] }, { name: "Lunch", items: ["Salad with chicken"] }] }],
+    steps: [{ id: 1, date: "2026-03-16", steps: 12400, goal: 12000 }, { id: 2, date: "2026-03-15", steps: 11200, goal: 12000 }],
+    supplements: [{ id: 1, name: "Vitamin D3", dose: "2000 IU", timing: "Morning", color: "#ffd93d", active: true }],
+    goals: [{ id: 1, name: "Lose 8kg", target: 8, current: 3.5, unit: "kg", category: "body", deadline: "2026-07-01" }, { id: 2, name: "Run 5km", target: 5, current: 3, unit: "km", category: "cardio", deadline: "2026-05-01" }],
+    checkins: [{ id: 1, date: "2026-03-17", type: "weekly", mood: 5, energy: 4, weight: 68.5, compliance: "4/4 workouts", notes: "Really happy this week! Energy is up and clothes fitting better already", measurements: { chest: 90, waist: 74, hips: 98 } }],
+    plan: { training: "3x full body + 2x cardio. Prioritise movement variety to keep motivation high.", nutrition: "1650 kcal. High protein to preserve muscle during deficit. No strict meal timing.", notes: "Highly motivated. Responds well to positive feedback. Watch for under-eating on weekends." },
+  },
+  c3: {
+    workouts: [{ id: 1, date: "2026-03-16", name: "Strength & Power", duration: 65, exercises: [{ name: "Squat", sets: [{w:100,r:5},{w:110,r:3},{w:115,r:2}] }, { name: "Power Clean", sets: [{w:60,r:3},{w:65,r:3}] }] }],
+    nutrition: [{ id: 1, date: "2026-03-16", calories: 3100, protein: 220, carbs: 380, fat: 85, meals: [{ name: "Pre-workout", items: ["Rice cakes","Banana","Whey"] }, { name: "Post-workout", items: ["Chicken 250g","Rice 200g","Broccoli"] }] }],
+    steps: [{ id: 1, date: "2026-03-16", steps: 7800, goal: 8000 }],
+    supplements: [{ id: 1, name: "Creatine", dose: "5g", timing: "Post-workout", color: "#4ecdc4", active: true }, { id: 2, name: "Beta-Alanine", dose: "3.2g", timing: "Pre-workout", color: "#a78bfa", active: true }],
+    goals: [{ id: 1, name: "Squat 140kg", target: 140, current: 115, unit: "kg", category: "strength", deadline: "2026-06-01" }, { id: 2, name: "Vertical Jump 70cm", target: 70, current: 62, unit: "cm", category: "cardio", deadline: "2026-05-01" }],
+    checkins: [{ id: 1, date: "2026-03-17", type: "weekly", mood: 4, energy: 5, weight: 88.2, compliance: "5/5 workouts", notes: "PB on squat this week. Feeling explosive. Recovery could be better.", measurements: { chest: 108, waist: 84, hips: 104 } }],
+    plan: { training: "5x per week. Strength focus Mon/Wed/Fri, power/plyometrics Tue/Thu. Periodised 4-week blocks.", nutrition: "3100 kcal performance nutrition. Pre/intra/post workout timing is critical.", notes: "Elite mindset. Push intensity on strength days. Monitor recovery carefully." },
+  },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const today = () => new Date().toISOString().split("T")[0];
+const fmt = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+const totalVol = (ex) => ex.sets.reduce((s, set) => s + (set.w || 0) * set.r, 0);
+const stepsToKm = (s) => (s * 0.000762).toFixed(1);
+const stepsToCal = (s) => Math.round(s * 0.04);
+
+// ─── Logo SVG ─────────────────────────────────────────────────────────────────
+function LFLogo({ size = 36 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+      <polygon points="20,2 38,12 38,28 20,38 2,28 2,12" fill="#FF6B35" opacity="0.15"/>
+      <polygon points="20,2 38,12 38,28 20,38 2,28 2,12" fill="none" stroke="#FF6B35" strokeWidth="1.5"/>
+      <polygon points="20,8 32,15 32,25 20,32 8,25 8,15" fill="#FF6B35" opacity="0.2"/>
+      <text x="20" y="26" textAnchor="middle" fill="#FF6B35" fontSize="14" fontWeight="900" fontFamily="'DM Sans',sans-serif" letterSpacing="-1">LF</text>
+    </svg>
+  );
+}
+
+function LFLogoLarge({ size = 80 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
+      <polygon points="40,4 76,24 76,56 40,76 4,56 4,24" fill="#FF6B35" opacity="0.12"/>
+      <polygon points="40,4 76,24 76,56 40,76 4,56 4,24" fill="none" stroke="#FF6B35" strokeWidth="2"/>
+      <polygon points="40,14 66,29 66,51 40,66 14,51 14,29" fill="#FF6B35" opacity="0.18"/>
+      <polygon points="40,22 58,33 58,47 40,58 22,47 22,33" fill="#FF6B35" opacity="0.25"/>
+      <text x="40" y="51" textAnchor="middle" fill="#FF6B35" fontSize="26" fontWeight="900" fontFamily="'DM Sans',sans-serif" letterSpacing="-2">LF</text>
+    </svg>
+  );
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+const Icon = ({ n, s = 20 }) => {
+  const icons = {
+    dumbbell: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11"/><path d="M6.5 17.5h11"/><path d="M3 9.5h3v5H3z"/><path d="M18 9.5h3v5h-3z"/><path d="M6.5 9.5v5"/><path d="M17.5 9.5v5"/></svg>,
+    apple: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20.94c1.5 0 7-1.24 7-9.94C19 7.35 16.5 5 12 5s-7 2.35-7 6c0 8.7 5.5 9.94 7 9.94z"/><path d="M12 5c0-1.5.6-3 2-4"/></svg>,
+    target: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+    chart: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+    plus: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    trash: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
+    fire: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0011 17h2a2.5 2.5 0 002.5-2.5c0-1.5-.5-2.5-2.5-4.5C11 12 8.5 11 8.5 14.5z"/><path d="M12 2C9 6 6 8.5 6 13c0 3.3 2.7 6 6 6s6-2.7 6-6c0-4.5-3-7-6-11z"/></svg>,
+    check: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+    x: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+    bolt: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+    footprint: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.5 2 10 3.5 10 5c0 1.5-.7 2.5-1 4s0 3 2 4"/><path d="M12 14c2 1 3.5 2 4 4"/><path d="M16 13c1 0 4 .5 4 2.5S18 19 16 19c-2 0-3-1-4-2"/></svg>,
+    pill: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/></svg>,
+    users: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    clip: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+    shield: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+    edit: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    back: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+    logout: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+    star: <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  };
+  return icons[n] || null;
+};
+
+// ─── Ring ─────────────────────────────────────────────────────────────────────
+function Ring({ pct, size = 60, stroke = 6, color = "#FF6B35", children }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const filled = circ * Math.min(1, pct / 100);
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1e1e2a" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" style={{ transition: "stroke-dasharray .8s ease" }} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════════════════════
+function LawtonFitness() {
+  const [session, setSession] = useState(null); // null | { role: "owner" } | { role: "client", client }
+  const [clients, setClients] = useState([]);
+  const [ownerData, setOwnerData] = useState(null);
+  const [clientData, setClientData] = useState({}); // { [id]: { workouts, nutrition, steps, supplements, goals, checkins, plan } }
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const c = await load(KEYS.clients) || SEED_CLIENTS;
+      const od = await load(KEYS.ownerData) || SEED_OWNER_DATA;
+      setClients(c);
+      setOwnerData(od);
+      // Load all client data
+      const cd = {};
+      for (const client of c) {
+        cd[client.id] = {
+          workouts: await load(KEYS.workouts(client.id)) || (SEED_CLIENT_DATA[client.id]?.workouts || []),
+          nutrition: await load(KEYS.nutrition(client.id)) || (SEED_CLIENT_DATA[client.id]?.nutrition || []),
+          steps: await load(KEYS.steps(client.id)) || (SEED_CLIENT_DATA[client.id]?.steps || []),
+          supplements: await load(KEYS.supplements(client.id)) || (SEED_CLIENT_DATA[client.id]?.supplements || []),
+          goals: await load(KEYS.goals(client.id)) || (SEED_CLIENT_DATA[client.id]?.goals || []),
+          checkins: await load(KEYS.checkins(client.id)) || (SEED_CLIENT_DATA[client.id]?.checkins || []),
+          plan: await load(KEYS.plans(client.id)) || (SEED_CLIENT_DATA[client.id]?.plan || { training: "", nutrition: "", notes: "" }),
+        };
+      }
+      setClientData(cd);
+      setLoaded(true);
+    })();
+  }, []);
+
+  // Persist helpers
+  const saveOwnerData = (od) => { setOwnerData(od); save(KEYS.ownerData, od); };
+  const saveClientField = (id, field, val) => {
+    const updated = { ...clientData, [id]: { ...clientData[id], [field]: val } };
+    setClientData(updated);
+    save(KEYS[field] ? KEYS[field](id) : `lf:${field}:${id}`, val);
+  };
+  const saveClientPlan = (id, plan) => {
+    const updated = { ...clientData, [id]: { ...clientData[id], plan } };
+    setClientData(updated);
+    save(KEYS.plans(id), plan);
+  };
+  const addClient = (c) => {
+    const newClient = { ...c, id: `c${Date.now()}`, joined: today(), avatar: c.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) };
+    const updated = [...clients, newClient];
+    setClients(updated);
+    save(KEYS.clients, updated);
+    const emptyData = { workouts: [], nutrition: [], steps: [], supplements: [], goals: [], checkins: [], plan: { training: "", nutrition: "", notes: "" } };
+    setClientData(p => ({ ...p, [newClient.id]: emptyData }));
+  };
+  const removeClient = (id) => {
+    const updated = clients.filter(c => c.id !== id);
+    setClients(updated);
+    save(KEYS.clients, updated);
+  };
+  const toggleClientStatus = (id) => {
+    const updated = clients.map(c => c.id === id ? { ...c, status: c.status === "active" ? "paused" : "active" } : c);
+    setClients(updated);
+    save(KEYS.clients, updated);
+  };
+
+  if (!loaded) return (
+    <div style={{ background: "#0a0a0f", height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
+      <LFLogoLarge size={70} />
+      <div style={{ color: "#FF6B35", fontFamily: "'DM Sans',sans-serif", fontSize: 13, letterSpacing: 4, opacity: .7 }}>LOADING...</div>
+    </div>
+  );
+
+  if (!session) return <PINScreen clients={clients} onOwnerLogin={() => setSession({ role: "owner" })} onClientLogin={(c) => setSession({ role: "client", client: c })} />;
+  if (session.role === "owner") return <OwnerApp clients={clients} ownerData={ownerData} clientData={clientData} onLogout={() => setSession(null)} saveOwnerData={saveOwnerData} saveClientField={saveClientField} saveClientPlan={saveClientPlan} addClient={addClient} removeClient={removeClient} toggleClientStatus={toggleClientStatus} />;
+  if (session.role === "client") return <ClientApp client={session.client} data={clientData[session.client.id] || {}} onLogout={() => setSession(null)} onSave={(field, val) => saveClientField(session.client.id, field, val)} />;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PIN SCREEN
+// ═══════════════════════════════════════════════════════════════════════════════
+function PINScreen({ clients, onOwnerLogin, onClientLogin }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [mode, setMode] = useState("select"); // "select" | "owner" | "client" | "clientpin"
+  const [selectedClient, setSelectedClient] = useState(null);
+
+  const handlePinDigit = (d) => {
+    const next = pin + d;
+    setPin(next);
+    setError("");
+    if (next.length === 4) {
+      if (mode === "owner") {
+        if (next === OWNER_PIN) { onOwnerLogin(); }
+        else { setError("Incorrect PIN"); setPin(""); }
+      } else if (mode === "clientpin" && selectedClient) {
+        if (next === selectedClient.pin) { onClientLogin(selectedClient); }
+        else { setError("Incorrect PIN"); setPin(""); }
+      }
+    }
+  };
+
+  const clear = () => { setPin(""); setError(""); };
+  const back = () => { setPin(""); setError(""); setMode("select"); setSelectedClient(null); };
+
+  return (
+    <div style={S.pinScreen}>
+      <style>{css}</style>
+
+```
+  <div style={S.pinBox}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 32 }}>
+      <LFLogoLarge size={72} />
+      <div style={S.brandName}>LAWTON FITNESS</div>
+      <div style={S.brandTagline}>Your personal coaching platform</div>
+    </div>
+
+    {mode === "select" && (
+      <div style={{ width: "100%" }}>
+        <div style={S.pinLabel}>Sign in as</div>
+        <button style={S.loginTypeBtn} onClick={() => setMode("owner")}>
+          <div style={S.loginTypeBtnIcon}><Icon n="shield" s={22} /></div>
+          <div><div style={{ fontWeight: 700, color: "#fff", fontSize: 15 }}>Lawton</div><div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Owner & Coach</div></div>
+        </button>
+        <div style={S.pinDivider}>— or select a client —</div>
+        {clients.map(c => (
+          <button key={c.id} style={{ ...S.loginTypeBtn, ...(c.status === "paused" ? { opacity: .5 } : {}) }}
+            onClick={() => { if (c.status !== "paused") { setSelectedClient(c); setMode("clientpin"); } }}>
+            <div style={{ ...S.avatar, background: avatarColor(c.name) }}>{c.avatar}</div>
+            <div><div style={{ fontWeight: 700, color: "#fff", fontSize: 15 }}>{c.name}</div><div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{c.goal}</div></div>
+            {c.status === "paused" && <span style={{ marginLeft: "auto", fontSize: 10, color: "#666", fontWeight: 700, textTransform: "uppercase" }}>Paused</span>}
+          </button>
+        ))}
+      </div>
+    )}
+
+    {(mode === "owner" || mode === "clientpin") && (
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <button style={S.backBtn} onClick={back}><Icon n="back" s={16} /> Back</button>
+        <div style={S.pinLabel}>{mode === "owner" ? "Enter owner PIN" : `PIN for ${selectedClient?.name}`}</div>
+        <div style={S.pinDots}>
+          {[0,1,2,3].map(i => <div key={i} style={{ ...S.pinDot, background: pin.length > i ? "#FF6B35" : "#1e1e2a", border: pin.length > i ? "none" : "2px solid #333" }} />)}
+        </div>
+        {error && <div style={S.pinError}>{error}</div>}
+        <div style={S.numPad}>
+          {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((d, i) => (
+            <button key={i} style={{ ...S.numBtn, ...(d === "" ? { opacity: 0, pointerEvents: "none" } : {}) }}
+              onClick={() => d === "⌫" ? (setPin(p => p.slice(0,-1)), setError("")) : d !== "" && handlePinDigit(String(d))}>
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+```
+
+);
+}
+
+function avatarColor(name) {
+const colors = [”#FF6B35”, “#4ecdc4”, “#a78bfa”, “#ffd93d”, “#ff6b6b”, “#06d6a0”];
+let h = 0; for (let c of name) h += c.charCodeAt(0);
+return colors[h % colors.length];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OWNER APP
+// ═══════════════════════════════════════════════════════════════════════════════
+function OwnerApp({ clients, ownerData, clientData, onLogout, saveOwnerData, saveClientField, saveClientPlan, addClient, removeClient, toggleClientStatus }) {
+const [tab, setTab] = useState(“home”);
+const [selectedClient, setSelectedClient] = useState(null);
+const [modal, setModal] = useState(null);
+
+const ownerActions = {
+addWorkout: (w) => saveOwnerData({ …ownerData, workouts: [{ …w, id: Date.now() }, …ownerData.workouts] }),
+addNutrition: (n) => saveOwnerData({ …ownerData, nutrition: [{ …n, id: Date.now() }, …ownerData.nutrition] }),
+addSteps: (s) => saveOwnerData({ …ownerData, steps: [{ …s, id: Date.now() }, …ownerData.steps.filter(x => x.date !== s.date)] }),
+addSupplement: (s) => saveOwnerData({ …ownerData, supplements: […ownerData.supplements, { …s, id: Date.now() }] }),
+addGoal: (g) => saveOwnerData({ …ownerData, goals: […ownerData.goals, { …g, id: Date.now() }] }),
+deleteWorkout: (id) => saveOwnerData({ …ownerData, workouts: ownerData.workouts.filter(w => w.id !== id) }),
+deleteGoal: (id) => saveOwnerData({ …ownerData, goals: ownerData.goals.filter(g => g.id !== id) }),
+toggleSupplement: (id) => saveOwnerData({ …ownerData, supplements: ownerData.supplements.map(s => s.id === id ? { …s, active: !s.active } : s) }),
+deleteSupplement: (id) => saveOwnerData({ …ownerData, supplements: ownerData.supplements.filter(s => s.id !== id) }),
+updateGoal: (id, val) => saveOwnerData({ …ownerData, goals: ownerData.goals.map(g => g.id === id ? { …g, current: Number(val) } : g) }),
+};
+
+if (selectedClient) {
+return <ClientDetailView client={selectedClient} data={clientData[selectedClient.id] || {}} onBack={() => setSelectedClient(null)} onSaveField={(f, v) => saveClientField(selectedClient.id, f, v)} onSavePlan={(p) => saveClientPlan(selectedClient.id, p)} />;
+}
+
+const navItems = [
+{ id: “home”, icon: “bolt”, label: “Home” },
+{ id: “clients”, icon: “users”, label: “Clients” },
+{ id: “workouts”, icon: “dumbbell”, label: “Workouts” },
+{ id: “nutrition”, icon: “apple”, label: “Nutrition” },
+{ id: “steps”, icon: “footprint”, label: “Steps” },
+{ id: “supplements”, icon: “pill”, label: “Supps” },
+{ id: “goals”, icon: “target”, label: “Goals” },
+];
+
+const fabMap = { workouts: “workout”, nutrition: “nutrition”, steps: “steps”, supplements: “supplement”, goals: “goal”, clients: “client” };
+
+return (
+<div style={S.app}>
+<style>{css}</style>
+<header style={S.header}>
+<div style={{ display: “flex”, alignItems: “center”, gap: 10 }}>
+<LFLogo size={34} />
+<div>
+<div style={S.brandNameSmall}>LAWTON FITNESS</div>
+<div style={{ fontSize: 10, color: “#FF6B35”, fontWeight: 700, letterSpacing: 1 }}>OWNER</div>
+</div>
+</div>
+<button style={S.logoutBtn} onClick={onLogout}><Icon n="logout" s={16} /></button>
+</header>
+<nav style={S.nav}>
+{navItems.map(({ id, icon, label }) => (
+<button key={id} style={{ …S.navBtn, …(tab === id ? S.navBtnActive : {}) }} onClick={() => setTab(id)}>
+<Icon n={icon} s={17} /><span>{label}</span>
+</button>
+))}
+</nav>
+<main style={S.main}>
+{tab === “home” && <OwnerHome clients={clients} ownerData={ownerData} clientData={clientData} setTab={setTab} setModal={setModal} setSelectedClient={setSelectedClient} />}
+{tab === “clients” && <ClientsTab clients={clients} clientData={clientData} onSelect={setSelectedClient} onToggle={toggleClientStatus} onRemove={removeClient} setModal={setModal} />}
+{tab === “workouts” && <WorkoutsTab workouts={ownerData.workouts} onDelete={ownerActions.deleteWorkout} setModal={setModal} />}
+{tab === “nutrition” && <NutritionTab nutrition={ownerData.nutrition} setModal={setModal} />}
+{tab === “steps” && <StepsTab steps={ownerData.steps} setModal={setModal} />}
+{tab === “supplements” && <SupplementsTab supplements={ownerData.supplements} onToggle={ownerActions.toggleSupplement} onDelete={ownerActions.deleteSupplement} setModal={setModal} />}
+{tab === “goals” && <GoalsTab goals={ownerData.goals} onDelete={ownerActions.deleteGoal} onUpdate={ownerActions.updateGoal} setModal={setModal} />}
+</main>
+{tab !== “home” && <button style={S.fab} className=“fab” onClick={() => setModal(fabMap[tab] || “workout”)}><Icon n="plus" s={24} /></button>}
+{modal === “workout” && <WorkoutModal onClose={() => setModal(null)} onSave={w => { ownerActions.addWorkout(w); setModal(null); }} />}
+{modal === “nutrition” && <NutritionModal onClose={() => setModal(null)} onSave={n => { ownerActions.addNutrition(n); setModal(null); }} />}
+{modal === “steps” && <StepsModal onClose={() => setModal(null)} onSave={s => { ownerActions.addSteps(s); setModal(null); }} />}
+{modal === “supplement” && <SupplementModal onClose={() => setModal(null)} onSave={s => { ownerActions.addSupplement(s); setModal(null); }} />}
+{modal === “goal” && <GoalModal onClose={() => setModal(null)} onSave={g => { ownerActions.addGoal(g); setModal(null); }} />}
+{modal === “client” && <AddClientModal onClose={() => setModal(null)} onSave={c => { addClient(c); setModal(null); }} />}
+</div>
+);
+}
+
+function OwnerHome({ clients, ownerData, clientData, setTab, setModal, setSelectedClient }) {
+const active = clients.filter(c => c.status === “active”);
+const recentCheckins = clients.flatMap(c => (clientData[c.id]?.checkins || []).map(ci => ({ …ci, clientName: c.name, clientId: c.id, avatar: c.avatar })))
+.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+const todaySteps = ownerData.steps?.find(s => s.date === today());
+const stepPct = todaySteps ? Math.round((todaySteps.steps / todaySteps.goal) * 100) : 0;
+
+return (
+<div style={S.section}>
+<div style={{ marginBottom: 24 }}>
+<div style={{ color: “#888”, fontSize: 13 }}>Good {getGreeting()},</div>
+<div style={{ fontSize: 28, fontWeight: 900, color: “#fff”, letterSpacing: -1 }}>Coach Lawton 👋</div>
+</div>
+
+```
+  {/* Coach stats */}
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+    {[
+      { val: active.length, label: "Active Clients", color: "#FF6B35" },
+      { val: clients.flatMap(c => clientData[c.id]?.checkins || []).filter(ci => { const d = new Date(ci.date + "T00:00:00"); return (new Date() - d) / 86400000 <= 7; }).length, label: "Checkins This Week", color: "#4ecdc4" },
+      { val: clients.filter(c => (clientData[c.id]?.checkins || []).length > 0 && (new Date() - new Date((clientData[c.id]?.checkins.sort((a,b)=>b.date.localeCompare(a.date))[0]?.date||"2000-01-01") + "T00:00:00")) / 86400000 <= 7).length, label: "Clients Active Today", color: "#a78bfa" },
+    ].map((s, i) => (
+      <div key={i} style={{ background: "#12121a", border: "1px solid #222", borderRadius: 14, padding: "14px 12px" }}>
+        <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: -1 }}>{s.val}</div>
+        <div style={{ fontSize: 10, color: "#555", marginTop: 6, lineHeight: 1.3 }}>{s.label}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* Recent check-ins */}
+  {recentCheckins.length > 0 && (
+    <div style={S.card} className="card">
+      <div style={S.sectionLabel}>Recent Check-ins</div>
+      {recentCheckins.map((ci, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < recentCheckins.length - 1 ? "1px solid #1e1e2a" : "none", cursor: "pointer" }}
+          onClick={() => setSelectedClient(clients.find(c => c.id === ci.clientId))}>
+          <div style={{ ...S.avatar, background: avatarColor(ci.clientName), width: 36, height: 36, fontSize: 12 }}>{ci.avatar}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, color: "#fff", fontSize: 14 }}>{ci.clientName}</div>
+            <div style={{ fontSize: 12, color: "#888" }}>{fmt(ci.date)} · Mood {ci.mood}/5 · Energy {ci.energy}/5</div>
+          </div>
+          <div style={{ display: "flex", gap: 2 }}>
+            {[1,2,3,4,5].map(n => <span key={n} style={{ color: n <= ci.mood ? "#FF6B35" : "#333", fontSize: 10 }}>★</span>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Client list quick access */}
+  <div style={S.card} className="card">
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      <div style={S.sectionLabel}>Your Clients</div>
+      <button style={S.addBtn} onClick={() => setTab("clients")}><Icon n="users" s={14} /> View All</button>
+    </div>
+    {active.map(c => {
+      const cd = clientData[c.id] || {};
+      const lastCheckin = cd.checkins?.sort((a,b) => b.date.localeCompare(a.date))[0];
+      return (
+        <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid #1e1e2a", cursor: "pointer" }} onClick={() => setSelectedClient(c)}>
+          <div style={{ ...S.avatar, background: avatarColor(c.name) }}>{c.avatar}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, color: "#fff", fontSize: 14 }}>{c.name}</div>
+            <div style={{ fontSize: 12, color: "#888" }}>{c.goal}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            {lastCheckin ? <div style={{ fontSize: 11, color: "#555" }}>Last: {fmt(lastCheckin.date)}</div> : <div style={{ fontSize: 11, color: "#444" }}>No check-ins</div>}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* Your steps */}
+  <div style={S.card} className="card">
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+      <div style={S.sectionLabel}>Your Steps Today</div>
+      <button style={S.addBtn} onClick={() => setModal("steps")}><Icon n="plus" s={14} /> Log</button>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
+      <Ring pct={stepPct} size={68} stroke={7} color={stepPct >= 100 ? "#FF6B35" : "#4ecdc4"}>
+        <span style={{ fontSize: 11, fontWeight: 900, color: "#fff" }}>{stepPct}%</span>
+      </Ring>
+      <div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", letterSpacing: -1 }}>{todaySteps ? todaySteps.steps.toLocaleString() : "—"} <span style={{ fontSize: 13, color: "#666", fontWeight: 400 }}>steps</span></div>
+        <div style={{ fontSize: 12, color: "#888" }}>Goal: {(todaySteps?.goal || 10000).toLocaleString()}</div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+);
+}
+
+// ─── Clients Tab ──────────────────────────────────────────────────────────────
+function ClientsTab({ clients, clientData, onSelect, onToggle, onRemove, setModal }) {
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>Clients</div>
+<button style={S.addBtn} onClick={() => setModal(“client”)}><Icon n="plus" s={16} /> Add Client</button>
+</div>
+{clients.map(c => {
+const cd = clientData[c.id] || {};
+const checkins = cd.checkins || [];
+const lastCheckin = checkins.sort((a,b) => b.date.localeCompare(a.date))[0];
+const goals = cd.goals || [];
+return (
+<div key={c.id} style={{ …S.card, …(c.status === “paused” ? { opacity: .6 } : {}) }} className=“card”>
+<div style={{ display: “flex”, gap: 14, alignItems: “flex-start” }}>
+<div style={{ …S.avatar, background: avatarColor(c.name), width: 50, height: 50, fontSize: 16, flexShrink: 0 }}>{c.avatar}</div>
+<div style={{ flex: 1 }}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center” }}>
+<div style={{ fontWeight: 800, color: “#fff”, fontSize: 16 }}>{c.name}</div>
+<span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: “uppercase”, padding: “3px 10px”, borderRadius: 20, background: c.status === “active” ? “#FF6B3522” : “#33333388”, color: c.status === “active” ? “#FF6B35” : “#666”, border: `1px solid ${c.status === "active" ? "#FF6B3544" : "#444"}` }}>{c.status}</span>
+</div>
+<div style={{ fontSize: 12, color: “#888”, marginTop: 2 }}>{c.goal}</div>
+<div style={{ fontSize: 11, color: “#555”, marginTop: 4 }}>Member since {fmt(c.joined)} · {c.email}</div>
+<div style={{ display: “flex”, gap: 16, marginTop: 10 }}>
+<span style={{ fontSize: 12, color: “#666” }}>{cd.workouts?.length || 0} workouts</span>
+<span style={{ fontSize: 12, color: “#666” }}>{checkins.length} check-ins</span>
+<span style={{ fontSize: 12, color: “#666” }}>{goals.length} goals</span>
+</div>
+{lastCheckin && <div style={{ fontSize: 11, color: “#4ecdc4”, marginTop: 6 }}>Last check-in: {fmt(lastCheckin.date)} · Mood {lastCheckin.mood}/5</div>}
+</div>
+</div>
+<div style={{ display: “flex”, gap: 8, marginTop: 14, paddingTop: 14, borderTop: “1px solid #1e1e2a” }}>
+<button style={S.actionBtn} onClick={() => onSelect(c)}><Icon n="edit" s={14} /> View & Manage</button>
+<button style={{ …S.actionBtn, color: c.status === “active” ? “#ffd93d” : “#4ecdc4”, borderColor: c.status === “active” ? “#ffd93d44” : “#4ecdc444”, background: c.status === “active” ? “#ffd93d14” : “#4ecdc414” }} onClick={() => onToggle(c.id)}>
+{c.status === “active” ? “Pause” : “Activate”}
+</button>
+<button style={{ …S.actionBtn, color: “#ff6b6b”, borderColor: “#ff6b6b44”, background: “#ff6b6b14”, marginLeft: “auto” }} onClick={() => onRemove(c.id)}><Icon n="trash" s={14} /></button>
+</div>
+</div>
+);
+})}
+</div>
+);
+}
+
+// ─── Client Detail View (Owner) ───────────────────────────────────────────────
+function ClientDetailView({ client, data, onBack, onSaveField, onSavePlan }) {
+const [tab, setTab] = useState(“overview”);
+const [editingPlan, setEditingPlan] = useState(false);
+const [planDraft, setPlanDraft] = useState(data.plan || { training: “”, nutrition: “”, notes: “” });
+const [checkinModal, setCheckinModal] = useState(false);
+
+const checkins = (data.checkins || []).sort((a,b) => b.date.localeCompare(a.date));
+const latestCheckin = checkins[0];
+
+return (
+<div style={S.app}>
+<style>{css}</style>
+<header style={{ …S.header, paddingBottom: 14, borderBottom: “1px solid #1a1a24” }}>
+<button style={S.backBtnHeader} onClick={onBack}><Icon n="back" s={18} /></button>
+<div style={{ display: “flex”, alignItems: “center”, gap: 10 }}>
+<div style={{ …S.avatar, background: avatarColor(client.name) }}>{client.avatar}</div>
+<div><div style={{ fontWeight: 800, color: “#fff”, fontSize: 15 }}>{client.name}</div><div style={{ fontSize: 11, color: “#888” }}>{client.goal}</div></div>
+</div>
+<div style={{ width: 36 }} />
+</header>
+
+```
+  <nav style={{ ...S.nav, paddingTop: 10 }}>
+    {[{ id: "overview", label: "Overview" }, { id: "checkins", label: "Check-ins" }, { id: "plan", label: "Plan" }, { id: "workouts", label: "Workouts" }, { id: "nutrition", label: "Nutrition" }, { id: "goals", label: "Goals" }].map(({ id, label }) => (
+      <button key={id} style={{ ...S.navBtn, ...(tab === id ? S.navBtnActive : {}), minWidth: 64 }} onClick={() => setTab(id)}><span style={{ fontSize: 11 }}>{label}</span></button>
+    ))}
+  </nav>
+
+  <main style={S.main}>
+    {/* OVERVIEW */}
+    {tab === "overview" && (
+      <div style={S.section}>
+        {/* Latest check-in summary */}
+        {latestCheckin ? (
+          <div style={{ ...S.card, borderColor: "#FF6B3544", background: "#FF6B3508" }} className="card">
+            <div style={S.sectionLabel}>Latest Check-in — {fmt(latestCheckin.date)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+              {[{ label: "Mood", val: `${latestCheckin.mood}/5`, color: "#FF6B35" }, { label: "Energy", val: `${latestCheckin.energy}/5`, color: "#ffd93d" }, { label: "Weight", val: `${latestCheckin.weight}kg`, color: "#4ecdc4" }].map((s, i) => (
+                <div key={i} style={{ background: "#1a1a26", borderRadius: 12, padding: 12, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.val}</div>
+                  <div style={{ fontSize: 10, color: "#666", marginTop: 4 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {latestCheckin.compliance && <div style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>Compliance: <span style={{ color: "#4ecdc4", fontWeight: 700 }}>{latestCheckin.compliance}</span></div>}
+            {latestCheckin.notes && <div style={{ fontSize: 13, color: "#ccc", background: "#1a1a26", borderRadius: 10, padding: 12 }}>"{latestCheckin.notes}"</div>}
+            {latestCheckin.measurements && (
+              <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                {Object.entries(latestCheckin.measurements).map(([k, v]) => (
+                  <div key={k} style={{ fontSize: 12, color: "#888" }}>{k}: <span style={{ color: "#fff", fontWeight: 700 }}>{v}cm</span></div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : <div style={{ ...S.card, color: "#555", textAlign: "center", padding: "24px" }} className="card">No check-ins yet from {client.name}</div>}
+
+        {/* Goals progress */}
+        <div style={S.card} className="card">
+          <div style={S.sectionLabel}>Goals Progress</div>
+          {(data.goals || []).length === 0 && <div style={{ color: "#555", fontSize: 13 }}>No goals set yet</div>}
+          {(data.goals || []).map((g, i) => {
+            const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+            return (
+              <div key={i} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ color: "#ccc", fontSize: 13 }}>{g.name}</span>
+                  <span style={{ color: "#FF6B35", fontWeight: 700, fontSize: 13 }}>{pct}%</span>
+                </div>
+                <div style={{ background: "#1e1e2a", borderRadius: 6, height: 7, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: "#FF6B35", borderRadius: 6, transition: "width .6s" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[
+            { label: "Workouts Logged", val: (data.workouts || []).length, color: "#e8ff47" },
+            { label: "Check-ins", val: checkins.length, color: "#FF6B35" },
+            { label: "Avg Step Goal", val: (data.steps||[]).length ? `${Math.round((data.steps||[]).filter(s=>s.steps>=s.goal).length/(data.steps||[]).length*100)}%` : "—", color: "#4ecdc4" },
+            { label: "Nutrition Days", val: (data.nutrition||[]).length, color: "#a78bfa" },
+          ].map((s, i) => (
+            <div key={i} style={{ background: "#12121a", border: "1px solid #222", borderRadius: 14, padding: 14 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: s.color }}>{s.val}</div>
+              <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* CHECK-INS */}
+    {tab === "checkins" && (
+      <div style={S.section}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={S.pageTitle}>Check-ins</div>
+        </div>
+        {checkins.length === 0 && <div style={S.empty}>No check-ins from {client.name} yet</div>}
+        {checkins.map((ci, i) => (
+          <div key={i} style={S.card} className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={S.sectionLabel}>{ci.type === "weekly" ? "Weekly Check-in" : "Daily Check-in"}</div>
+              <span style={{ fontSize: 12, color: "#555" }}>{fmt(ci.date)}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+              {[{ l: "Mood", v: `${ci.mood}/5`, c: "#FF6B35" }, { l: "Energy", v: `${ci.energy}/5`, c: "#ffd93d" }, { l: "Weight", v: `${ci.weight}kg`, c: "#4ecdc4" }].map((s, j) => (
+                <div key={j} style={{ background: "#1a1a26", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: s.c }}>{s.v}</div>
+                  <div style={{ fontSize: 10, color: "#666", marginTop: 3 }}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+            {ci.compliance && <div style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>Compliance: <span style={{ color: "#4ecdc4", fontWeight: 700 }}>{ci.compliance}</span></div>}
+            {ci.notes && <div style={{ fontSize: 13, color: "#ccc", background: "#1a1a26", borderRadius: 10, padding: 12, marginBottom: 10 }}>"{ci.notes}"</div>}
+            {ci.measurements && (
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {Object.entries(ci.measurements).map(([k, v]) => (
+                  <span key={k} style={{ fontSize: 12, color: "#888" }}>{k}: <span style={{ color: "#fff", fontWeight: 700 }}>{v}cm</span></span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* TRAINING & NUTRITION PLAN */}
+    {tab === "plan" && (
+      <div style={S.section}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={S.pageTitle}>Training Plan</div>
+          <button style={S.addBtn} onClick={() => setEditingPlan(!editingPlan)}><Icon n="edit" s={14} /> {editingPlan ? "Cancel" : "Edit"}</button>
+        </div>
+        {editingPlan ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={S.label}>Training Programme</label>
+              <textarea style={{ ...S.input, minHeight: 100, resize: "vertical" }} value={planDraft.training} onChange={e => setPlanDraft(p => ({ ...p, training: e.target.value }))} placeholder="Describe the training programme..." />
+            </div>
+            <div>
+              <label style={S.label}>Nutrition Plan</label>
+              <textarea style={{ ...S.input, minHeight: 100, resize: "vertical" }} value={planDraft.nutrition} onChange={e => setPlanDraft(p => ({ ...p, nutrition: e.target.value }))} placeholder="Calorie targets, macros, timing..." />
+            </div>
+            <div>
+              <label style={S.label}>Coach Notes (private)</label>
+              <textarea style={{ ...S.input, minHeight: 80, resize: "vertical" }} value={planDraft.notes} onChange={e => setPlanDraft(p => ({ ...p, notes: e.target.value }))} placeholder="Private coaching notes..." />
+            </div>
+            <button style={S.saveBtn} onClick={() => { onSavePlan(planDraft); setEditingPlan(false); }}>Save Plan</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[{ label: "Training Programme", val: data.plan?.training, icon: "dumbbell", color: "#FF6B35" }, { label: "Nutrition Plan", val: data.plan?.nutrition, icon: "apple", color: "#4ecdc4" }, { label: "Coach Notes (private)", val: data.plan?.notes, icon: "clip", color: "#a78bfa" }].map((p, i) => (
+              <div key={i} style={{ ...S.card, borderColor: p.color + "33" }} className="card">
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+                  <span style={{ color: p.color }}><Icon n={p.icon} s={16} /></span>
+                  <span style={S.sectionLabel}>{p.label}</span>
+                </div>
+                <div style={{ fontSize: 14, color: p.val ? "#ccc" : "#555", lineHeight: 1.6 }}>{p.val || "Not set yet — tap Edit to add."}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* WORKOUTS */}
+    {tab === "workouts" && (
+      <div style={S.section}>
+        <div style={S.pageTitle}>Workouts</div>
+        {(data.workouts || []).length === 0 && <div style={S.empty}>No workouts logged yet</div>}
+        {(data.workouts || []).map(w => (
+          <div key={w.id} style={S.card} className="card">
+            <div style={S.cardDate}>{fmt(w.date)}</div>
+            <div style={S.cardName}>{w.name}</div>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>{w.duration}min · {w.exercises.length} exercises</div>
+            {w.exercises.map((ex, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1a1a24" }}>
+                <span style={{ color: "#ccc", fontSize: 13 }}>{ex.name}</span>
+                <span style={{ color: "#555", fontSize: 12 }}>{ex.sets.length} sets · top {Math.max(...ex.sets.map(s => s.w || 0)) || "BW"}kg</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* NUTRITION */}
+    {tab === "nutrition" && (
+      <div style={S.section}>
+        <div style={S.pageTitle}>Nutrition</div>
+        {(data.nutrition || []).length === 0 && <div style={S.empty}>No nutrition data</div>}
+        {(data.nutrition || []).map(n => (
+          <div key={n.id} style={S.card} className="card">
+            <div style={S.cardDate}>{fmt(n.date)}</div>
+            <div style={S.cardName}>{n.calories} kcal</div>
+            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+              {[{ l: "Protein", v: n.protein, c: "#4ecdc4" }, { l: "Carbs", v: n.carbs, c: "#ffd93d" }, { l: "Fat", v: n.fat, c: "#ff6b6b" }].map((m, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: m.c }} />
+                  <span style={{ color: m.c, fontWeight: 800, fontSize: 14 }}>{m.v}g</span>
+                  <span style={{ color: "#555", fontSize: 11 }}>{m.l}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* GOALS */}
+    {tab === "goals" && (
+      <div style={S.section}>
+        <div style={S.pageTitle}>Goals</div>
+        {(data.goals || []).length === 0 && <div style={S.empty}>No goals set</div>}
+        {(data.goals || []).map((g, i) => {
+          const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+          return (
+            <div key={i} style={S.card} className="card">
+              <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: .5, textTransform: "uppercase", padding: "3px 8px", borderRadius: 6, marginBottom: 8, background: "#FF6B3522", color: "#FF6B35" }}>{g.category}</span>
+              <div style={S.cardName}>{g.name}</div>
+              {g.deadline && <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>Target: {fmt(g.deadline)}</div>}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1, background: "#1e1e2a", borderRadius: 6, height: 8, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: "#FF6B35", borderRadius: 6, transition: "width .6s" }} />
+                </div>
+                <span style={{ color: "#FF6B35", fontWeight: 700, fontSize: 14 }}>{pct}%</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>{g.current}{g.unit} / {g.target}{g.unit}</div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </main>
+</div>
+```
+
+);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLIENT APP
+// ═══════════════════════════════════════════════════════════════════════════════
+function ClientApp({ client, data, onLogout, onSave }) {
+const [tab, setTab] = useState(“home”);
+const [modal, setModal] = useState(null);
+
+const d = data || {};
+const actions = {
+addWorkout: (w) => onSave(“workouts”, [{ …w, id: Date.now() }, …(d.workouts || [])]),
+addNutrition: (n) => onSave(“nutrition”, [{ …n, id: Date.now() }, …(d.nutrition || [])]),
+addSteps: (s) => onSave(“steps”, [{ …s, id: Date.now() }, …(d.steps || []).filter(x => x.date !== s.date)]),
+addSupplement: (s) => onSave(“supplements”, […(d.supplements || []), { …s, id: Date.now() }]),
+toggleSupplement: (id) => onSave(“supplements”, (d.supplements || []).map(s => s.id === id ? { …s, active: !s.active } : s)),
+deleteSupplement: (id) => onSave(“supplements”, (d.supplements || []).filter(s => s.id !== id)),
+deleteWorkout: (id) => onSave(“workouts”, (d.workouts || []).filter(w => w.id !== id)),
+addCheckin: (ci) => onSave(“checkins”, [{ …ci, id: Date.now() }, …(d.checkins || [])]),
+};
+
+const fabMap = { workouts: “workout”, nutrition: “nutrition”, steps: “steps”, supplements: “supplement”, checkins: “checkin” };
+
+return (
+<div style={S.app}>
+<style>{css}</style>
+<header style={S.header}>
+<div style={{ display: “flex”, alignItems: “center”, gap: 10 }}>
+<LFLogo size={32} />
+<div>
+<div style={S.brandNameSmall}>LAWTON FITNESS</div>
+<div style={{ fontSize: 10, color: “#4ecdc4”, fontWeight: 700, letterSpacing: 1 }}>{client.name.toUpperCase()}</div>
+</div>
+</div>
+<button style={S.logoutBtn} onClick={onLogout}><Icon n="logout" s={16} /></button>
+</header>
+<nav style={S.nav}>
+{[
+{ id: “home”, icon: “bolt”, label: “Home” },
+{ id: “workouts”, icon: “dumbbell”, label: “Workouts” },
+{ id: “nutrition”, icon: “apple”, label: “Nutrition” },
+{ id: “steps”, icon: “footprint”, label: “Steps” },
+{ id: “supplements”, icon: “pill”, label: “Supps” },
+{ id: “checkins”, icon: “clip”, label: “Check-in” },
+{ id: “plan”, icon: “target”, label: “My Plan” },
+].map(({ id, icon, label }) => (
+<button key={id} style={{ …S.navBtn, …(tab === id ? { …S.navBtnActive, color: “#4ecdc4”, background: “#4ecdc418”, border: “1px solid #4ecdc433” } : {}) }} onClick={() => setTab(id)}>
+<Icon n={icon} s={17} /><span>{label}</span>
+</button>
+))}
+</nav>
+<main style={S.main}>
+{tab === “home”        && <ClientHome client={client} data={d} setModal={setModal} setTab={setTab} />}
+{tab === “workouts”    && <WorkoutsTab workouts={d.workouts || []} onDelete={actions.deleteWorkout} setModal={setModal} />}
+{tab === “nutrition”   && <NutritionTab nutrition={d.nutrition || []} setModal={setModal} />}
+{tab === “steps”       && <StepsTab steps={d.steps || []} setModal={setModal} />}
+{tab === “supplements” && <SupplementsTab supplements={d.supplements || []} onToggle={actions.toggleSupplement} onDelete={actions.deleteSupplement} setModal={setModal} />}
+{tab === “checkins”    && <CheckinsTab checkins={d.checkins || []} setModal={setModal} />}
+{tab === “plan”        && <ClientPlanView plan={d.plan} />}
+</main>
+<button style={{ …S.fab, background: “#4ecdc4” }} className=“fab” onClick={() => setModal(fabMap[tab] || “workout”)}><Icon n="plus" s={24} /></button>
+{modal === “workout”    && <WorkoutModal onClose={() => setModal(null)} onSave={w => { actions.addWorkout(w); setModal(null); }} />}
+{modal === “nutrition”  && <NutritionModal onClose={() => setModal(null)} onSave={n => { actions.addNutrition(n); setModal(null); }} />}
+{modal === “steps”      && <StepsModal onClose={() => setModal(null)} onSave={s => { actions.addSteps(s); setModal(null); }} />}
+{modal === “supplement” && <SupplementModal onClose={() => setModal(null)} onSave={s => { actions.addSupplement(s); setModal(null); }} />}
+{modal === “checkin”    && <CheckinModal onClose={() => setModal(null)} onSave={ci => { actions.addCheckin(ci); setModal(null); }} />}
+</div>
+);
+}
+
+function ClientHome({ client, data, setModal, setTab }) {
+const todaySteps = (data.steps || []).find(s => s.date === today());
+const stepPct = todaySteps ? Math.round((todaySteps.steps / todaySteps.goal) * 100) : 0;
+const activeSupps = (data.supplements || []).filter(s => s.active);
+const lastCheckin = (data.checkins || []).sort((a,b) => b.date.localeCompare(a.date))[0];
+
+return (
+<div style={S.section}>
+<div style={{ marginBottom: 20 }}>
+<div style={{ color: “#888”, fontSize: 13 }}>Welcome back,</div>
+<div style={{ fontSize: 26, fontWeight: 900, color: “#fff”, letterSpacing: -1 }}>{client.name.split(” “)[0]} 💪</div>
+</div>
+
+```
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+    {[
+      { label: "Workouts", val: (data.workouts||[]).length, color: "#4ecdc4" },
+      { label: "Check-ins", val: (data.checkins||[]).length, color: "#FF6B35" },
+      { label: "Steps Today", val: todaySteps ? `${Math.round(todaySteps.steps/1000)}k` : "—", color: "#e8ff47" },
+      { label: "Active Supps", val: activeSupps.length, color: "#a78bfa" },
+    ].map((s, i) => (
+      <div key={i} style={{ background: "#12121a", border: "1px solid #222", borderRadius: 14, padding: "14px 16px" }}>
+        <div style={{ fontSize: 24, fontWeight: 900, color: s.color }}>{s.val}</div>
+        <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>{s.label}</div>
+      </div>
+    ))}
+  </div>
+
+  {/* Steps ring */}
+  <div style={S.card} className="card">
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+      <div style={S.sectionLabel}>Today's Steps</div>
+      <button style={{ ...S.addBtn, color: "#4ecdc4", borderColor: "#4ecdc444", background: "#4ecdc414" }} onClick={() => setModal("steps")}><Icon n="plus" s={14} /> Log</button>
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <Ring pct={stepPct} size={72} stroke={7} color={stepPct >= 100 ? "#4ecdc4" : "#FF6B35"}>
+        <span style={{ fontSize: 11, fontWeight: 900, color: "#fff" }}>{stepPct}%</span>
+      </Ring>
+      <div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: -1 }}>{todaySteps ? todaySteps.steps.toLocaleString() : "—"}</div>
+        <div style={{ fontSize: 12, color: "#888" }}>goal: {(todaySteps?.goal || 10000).toLocaleString()}</div>
+      </div>
+    </div>
+  </div>
+
+  {/* Check-in prompt */}
+  <div style={{ ...S.card, borderColor: "#FF6B3544", background: "#FF6B3508" }} className="card">
+    <div style={S.sectionLabel}>Check-in with Coach Lawton</div>
+    {lastCheckin ? (
+      <div>
+        <div style={{ fontSize: 13, color: "#888", marginBottom: 10 }}>Last check-in: {fmt(lastCheckin.date)}</div>
+        <div style={{ fontSize: 13, color: "#ccc" }}>"{lastCheckin.notes}"</div>
+      </div>
+    ) : <div style={{ fontSize: 13, color: "#888" }}>Your first check-in is important — let Coach Lawton know how you're getting on.</div>}
+    <button style={{ ...S.saveBtn, marginTop: 14, padding: "12px", fontSize: 14, background: "#FF6B35" }} onClick={() => setModal("checkin")}>
+      Submit Check-in
+    </button>
+  </div>
+
+  {/* Today's plan preview */}
+  {data.plan?.training && (
+    <div style={S.card} className="card">
+      <div style={S.sectionLabel}>Your Training Plan</div>
+      <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>{data.plan.training.slice(0, 120)}{data.plan.training.length > 120 ? "..." : ""}</div>
+      <button style={{ marginTop: 10, background: "none", border: "none", color: "#4ecdc4", fontSize: 13, fontWeight: 700, padding: 0, cursor: "pointer" }} onClick={() => setTab("plan")}>View full plan →</button>
+    </div>
+  )}
+
+  {/* Quick actions */}
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
+    {[{ icon: "dumbbell", label: "Log Workout", m: "workout" }, { icon: "apple", label: "Log Meal", m: "nutrition" }, { icon: "clip", label: "Check-in", m: "checkin" }, { icon: "pill", label: "Supplements", m: "supplement" }].map((a, i) => (
+      <button key={i} style={S.qaBtn} className="qaBtn" onClick={() => setModal(a.m)}><Icon n={a.icon} s={20} />{a.label}</button>
+    ))}
+  </div>
+</div>
+```
+
+);
+}
+
+function CheckinsTab({ checkins, setModal }) {
+const sorted = […checkins].sort((a,b) => b.date.localeCompare(a.date));
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>My Check-ins</div>
+<button style={{ …S.addBtn, color: “#FF6B35”, borderColor: “#FF6B3566”, background: “#FF6B3514” }} onClick={() => setModal(“checkin”)}><Icon n="plus" s={16} /> New</button>
+</div>
+{sorted.length === 0 && <div style={S.empty}>No check-ins yet — submit your first one!</div>}
+{sorted.map((ci, i) => (
+<div key={i} style={S.card} className="card">
+<div style={{ display: “flex”, justifyContent: “space-between”, marginBottom: 12 }}>
+<div style={S.sectionLabel}>{ci.type === “weekly” ? “Weekly Check-in” : “Daily Check-in”}</div>
+<span style={{ fontSize: 12, color: “#555” }}>{fmt(ci.date)}</span>
+</div>
+<div style={{ display: “grid”, gridTemplateColumns: “1fr 1fr 1fr”, gap: 8, marginBottom: 12 }}>
+{[{ l: “Mood”, v: `${ci.mood}/5`, c: “#FF6B35” }, { l: “Energy”, v: `${ci.energy}/5`, c: “#ffd93d” }, { l: “Weight”, v: `${ci.weight}kg`, c: “#4ecdc4” }].map((s, j) => (
+<div key={j} style={{ background: “#1a1a26”, borderRadius: 10, padding: “10px 8px”, textAlign: “center” }}>
+<div style={{ fontSize: 16, fontWeight: 900, color: s.c }}>{s.v}</div>
+<div style={{ fontSize: 10, color: “#666”, marginTop: 3 }}>{s.l}</div>
+</div>
+))}
+</div>
+{ci.compliance && <div style={{ fontSize: 13, color: “#888”, marginBottom: 8 }}>Compliance: <span style={{ color: “#4ecdc4”, fontWeight: 700 }}>{ci.compliance}</span></div>}
+{ci.notes && <div style={{ fontSize: 13, color: “#ccc”, background: “#1a1a26”, borderRadius: 10, padding: 12, marginBottom: 8 }}>”{ci.notes}”</div>}
+{ci.measurements && <div style={{ display: “flex”, gap: 12, flexWrap: “wrap” }}>{Object.entries(ci.measurements).map(([k,v]) => <span key={k} style={{ fontSize: 12, color: “#888” }}>{k}: <span style={{ color: “#fff”, fontWeight: 700 }}>{v}cm</span></span>)}</div>}
+</div>
+))}
+</div>
+);
+}
+
+function ClientPlanView({ plan }) {
+return (
+<div style={S.section}>
+<div style={S.pageTitle}>My Plan</div>
+{!plan?.training && !plan?.nutrition ? (
+<div style={S.empty}>Your coach hasn’t set your plan yet. Check back soon!</div>
+) : (
+<div style={{ display: “flex”, flexDirection: “column”, gap: 12 }}>
+{[{ label: “Training Programme”, val: plan?.training, icon: “dumbbell”, color: “#FF6B35” }, { label: “Nutrition Plan”, val: plan?.nutrition, icon: “apple”, color: “#4ecdc4” }].map((p, i) => (
+p.val ? <div key={i} style={{ …S.card, borderColor: p.color + “33” }} className=“card”>
+<div style={{ display: “flex”, gap: 10, alignItems: “center”, marginBottom: 12 }}>
+<span style={{ color: p.color }}><Icon n={p.icon} s={18} /></span>
+<span style={S.sectionLabel}>{p.label}</span>
+</div>
+<div style={{ fontSize: 14, color: “#ccc”, lineHeight: 1.7 }}>{p.val}</div>
+</div> : null
+))}
+</div>
+)}
+</div>
+);
+}
+
+// ─── Shared Tabs (reusable for owner + client) ────────────────────────────────
+function WorkoutsTab({ workouts, onDelete, setModal }) {
+const [exp, setExp] = useState(null);
+const sorted = […workouts].sort((a,b) => b.date.localeCompare(a.date));
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>Workouts</div>
+<button style={S.addBtn} onClick={() => setModal(“workout”)}><Icon n="plus" s={16} /> Log</button>
+</div>
+{sorted.length === 0 && <div style={S.empty}>No workouts yet</div>}
+{sorted.map(w => (
+<div key={w.id} style={S.card} className="card">
+<div style={{ display: “flex”, justifyContent: “space-between”, cursor: “pointer” }} onClick={() => setExp(exp === w.id ? null : w.id)}>
+<div><div style={S.cardDate}>{fmt(w.date)}</div><div style={S.cardName}>{w.name}</div><div style={{ fontSize: 12, color: “#666” }}>{w.duration}min · {w.exercises.length} exercises</div></div>
+<div style={{ textAlign: “right” }}><div style={{ fontSize: 18, fontWeight: 900, color: “#FF6B35” }}>{w.exercises.reduce((t,e)=>t+totalVol(e),0).toLocaleString()}</div><div style={{ fontSize: 10, color: “#666” }}>kg vol.</div></div>
+</div>
+{exp === w.id && (
+<div style={{ marginTop: 14, paddingTop: 14, borderTop: “1px solid #1e1e2a” }}>
+{w.exercises.map((ex, i) => (
+<div key={i} style={{ marginBottom: 12 }}>
+<div style={{ fontSize: 12, fontWeight: 700, color: “#FF6B35”, marginBottom: 8 }}>{ex.name}</div>
+<div style={{ display: “flex”, flexWrap: “wrap”, gap: 8 }}>
+{ex.sets.map((s, j) => <div key={j} style={{ background: “#1e1e2a”, borderRadius: 8, padding: “6px 10px” }}><span style={{ fontSize: 10, color: “#666”, display: “block” }}>Set {j+1}</span><span style={{ fontSize: 13, fontWeight: 700 }}>{s.w ? `${s.w}kg` : “BW”} × {s.r}</span></div>)}
+</div>
+</div>
+))}
+{onDelete && <button style={S.deleteBtn} onClick={() => onDelete(w.id)}><Icon n="trash" s={14} /> Delete</button>}
+</div>
+)}
+</div>
+))}
+</div>
+);
+}
+
+function NutritionTab({ nutrition, setModal }) {
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>Nutrition</div>
+<button style={S.addBtn} onClick={() => setModal(“nutrition”)}><Icon n="plus" s={16} /> Log</button>
+</div>
+{nutrition.length === 0 && <div style={S.empty}>No nutrition logs yet</div>}
+{[…nutrition].sort((a,b)=>b.date.localeCompare(a.date)).map(n => (
+<div key={n.id} style={S.card} className="card">
+<div style={S.cardDate}>{fmt(n.date)}</div>
+<div style={S.cardName}>{n.calories} kcal</div>
+<div style={{ display: “flex”, gap: 12, marginTop: 8, flexWrap: “wrap” }}>
+{[{l:“Protein”,v:n.protein,c:”#4ecdc4”},{l:“Carbs”,v:n.carbs,c:”#ffd93d”},{l:“Fat”,v:n.fat,c:”#ff6b6b”}].map((m,i)=>(<div key={i} style={{ display:“flex”,alignItems:“center”,gap:6 }}><div style={{width:8,height:8,borderRadius:“50%”,background:m.c}}/><span style={{color:m.c,fontWeight:800,fontSize:14}}>{m.v}g</span><span style={{color:”#555”,fontSize:11}}>{m.l}</span></div>))}
+</div>
+{n.meals && <div style={{ marginTop: 12, paddingTop: 12, borderTop: “1px solid #1e1e2a” }}>{n.meals.map((m,i)=><div key={i} style={{display:“flex”,gap:8,marginBottom:6}}><span style={{color:”#888”,fontSize:12,fontWeight:700,minWidth:80}}>{m.name}</span><span style={{color:”#ccc”,fontSize:12}}>{m.items.join(”, “)}</span></div>)}</div>}
+</div>
+))}
+</div>
+);
+}
+
+function StepsTab({ steps, setModal }) {
+const sorted = […steps].sort((a,b) => b.date.localeCompare(a.date));
+const avg = steps.length ? Math.round(steps.reduce((t,s)=>t+s.steps,0)/steps.length) : 0;
+const maxS = Math.max(…steps.map(s=>s.steps), 1);
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>Steps</div>
+<button style={S.addBtn} onClick={() => setModal(“steps”)}><Icon n="plus" s={16} /> Log</button>
+</div>
+<div style={{ display: “grid”, gridTemplateColumns: “1fr 1fr 1fr”, gap: 10, marginBottom: 14 }}>
+{[{l:“Daily Avg”,v:avg.toLocaleString(),c:”#4ecdc4”},{l:“Total km”,v:`${steps.reduce((t,s)=>t+parseFloat(stepsToKm(s.steps)),0).toFixed(0)}km`,c:”#e8ff47”},{l:“Goals Hit”,v:`${steps.filter(s=>s.steps>=s.goal).length}/${steps.length}`,c:”#FF6B35”}].map((s,i)=>(
+<div key={i} style={{background:”#12121a”,border:“1px solid #222”,borderRadius:14,padding:“12px 10px”}}><div style={{fontSize:17,fontWeight:900,color:s.c}}>{s.v}</div><div style={{fontSize:10,color:”#555”,marginTop:4}}>{s.l}</div></div>
+))}
+</div>
+{steps.length > 0 && (
+<div style={S.card} className="card">
+<div style={S.sectionLabel}>Last 7 Days</div>
+<div style={{ display: “flex”, gap: 6, alignItems: “flex-end”, height: 80 }}>
+{sorted.slice(0,7).reverse().map((s,i)=>{ const h=(s.steps/maxS)*100; const hit=s.steps>=s.goal; return <div key={i} style={{flex:1,display:“flex”,flexDirection:“column”,alignItems:“center”,gap:4,height:“100%”}}><div style={{flex:1,width:“100%”,display:“flex”,alignItems:“flex-end”}}><div style={{width:“100%”,height:`${h}%`,background:hit?“linear-gradient(180deg,#FF6B35,#c44)”:“linear-gradient(180deg,#4ecdc4,#2a8a88)”,borderRadius:“4px 4px 0 0”,minHeight:4}}/></div><div style={{fontSize:9,color:”#555”}}>{fmt(s.date).split(” “)[0]}</div></div>; })}
+</div>
+</div>
+)}
+{sorted.length === 0 && <div style={S.empty}>No steps logged yet</div>}
+{sorted.map(s => { const pct=Math.min(100,Math.round((s.steps/s.goal)*100)); const hit=s.steps>=s.goal; return (
+<div key={s.id} style={{…S.card,…(hit?{borderColor:”#FF6B3544”,background:”#FF6B3508”}:{})}} className=“card”>
+<div style={{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:10}}>
+<div><div style={S.cardDate}>{fmt(s.date)}</div><div style={{fontSize:22,fontWeight:900,color:”#fff”,letterSpacing:-1}}>{s.steps.toLocaleString()} <span style={{fontSize:13,color:”#666”,fontWeight:400}}>steps</span></div></div>
+<Ring pct={pct} size={56} stroke={5} color={hit?”#FF6B35”:”#4ecdc4”}><span style={{fontSize:9,fontWeight:800,color:hit?”#FF6B35”:”#4ecdc4”}}>{pct}%</span></Ring>
+</div>
+<div style={{background:”#1e1e2a”,borderRadius:6,height:7,overflow:“hidden”,marginBottom:8}}><div style={{height:“100%”,width:`${pct}%`,background:hit?”#FF6B35”:”#4ecdc4”,borderRadius:6,transition:“width .6s”}}/></div>
+<div style={{display:“flex”,gap:14}}><span style={{fontSize:12,color:”#4ecdc4”}}>🏃 {stepsToKm(s.steps)} km</span><span style={{fontSize:12,color:”#ff6b6b”}}>🔥 {stepsToCal(s.steps)} kcal</span></div>
+</div>
+); })}
+</div>
+);
+}
+
+function SupplementsTab({ supplements, onToggle, onDelete, setModal }) {
+const active = supplements.filter(s => s.active);
+const timingGroups = {};
+active.forEach(s => { if (!timingGroups[s.timing]) timingGroups[s.timing] = []; timingGroups[s.timing].push(s); });
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>Supplements</div>
+<button style={S.addBtn} onClick={() => setModal(“supplement”)}><Icon n="plus" s={16} /> Add</button>
+</div>
+{Object.keys(timingGroups).length > 0 && (
+<div style={S.card} className="card">
+<div style={S.sectionLabel}>Today’s Schedule</div>
+{Object.entries(timingGroups).map(([t, supps]) => (
+<div key={t} style={{ marginBottom: 12 }}>
+<div style={{ fontSize: 10, color: “#666”, fontWeight: 700, letterSpacing: 1, textTransform: “uppercase”, marginBottom: 8 }}>{t}</div>
+<div style={{ display: “flex”, flexWrap: “wrap”, gap: 8 }}>
+{supps.map((s, i) => <div key={i} style={{ borderRadius: 20, padding: “7px 14px”, fontSize: 13, fontWeight: 600, border: `1px solid ${s.color}66`, color: s.color, background: s.color + “15” }}>{s.name} <span style={{ opacity: .7 }}>{s.dose}</span></div>)}
+</div>
+</div>
+))}
+</div>
+)}
+{supplements.length === 0 && <div style={S.empty}>No supplements added yet</div>}
+{supplements.map(s => (
+<div key={s.id} style={{ …S.card, …(s.active ? { borderColor: s.color + “44” } : { opacity: .55 }) }} className=“card”>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center” }}>
+<div style={{ display: “flex”, alignItems: “center”, gap: 12 }}>
+<div style={{ width: 44, height: 44, borderRadius: 12, background: s.color + “22”, border: `2px solid ${s.color}44`, display: “flex”, alignItems: “center”, justifyContent: “center”, color: s.color }}><Icon n="pill" s={20} /></div>
+<div><div style={{ fontSize: 15, fontWeight: 700, color: “#fff” }}>{s.name}</div><div style={{ fontSize: 12, color: “#888”, marginTop: 2 }}>{s.dose} · {s.timing}</div></div>
+</div>
+<div style={{ display: “flex”, gap: 8, alignItems: “center” }}>
+<div onClick={() => onToggle(s.id)} style={{ width: 44, height: 26, borderRadius: 13, background: s.active ? s.color : “#2a2a3a”, cursor: “pointer”, position: “relative”, transition: “background .2s”, flexShrink: 0 }}>
+<div style={{ position: “absolute”, top: 3, width: 20, height: 20, borderRadius: “50%”, background: “#fff”, transition: “transform .2s”, transform: s.active ? “translateX(21px)” : “translateX(3px)”, boxShadow: “0 1px 4px #0006” }} />
+</div>
+<button style={S.iconBtn} onClick={() => onDelete(s.id)}><Icon n="trash" s={14} /></button>
+</div>
+</div>
+</div>
+))}
+</div>
+);
+}
+
+function GoalsTab({ goals, onDelete, onUpdate, setModal }) {
+const [editing, setEditing] = useState({});
+return (
+<div style={S.section}>
+<div style={{ display: “flex”, justifyContent: “space-between”, alignItems: “center”, marginBottom: 20 }}>
+<div style={S.pageTitle}>Goals</div>
+<button style={S.addBtn} onClick={() => setModal(“goal”)}><Icon n="plus" s={16} /> Add</button>
+</div>
+{goals.length === 0 && <div style={S.empty}>No goals set</div>}
+{goals.map(g => {
+const pct = Math.min(100, Math.round((g.current / g.target) * 100)); const done = pct >= 100;
+return (
+<div key={g.id} style={{ …S.card, …(done ? { borderColor: “#FF6B3544”, background: “#FF6B3508” } : {}) }} className=“card”>
+<span style={{ display: “inline-block”, fontSize: 10, fontWeight: 700, padding: “3px 8px”, borderRadius: 6, marginBottom: 8, background: “#FF6B3522”, color: “#FF6B35”, textTransform: “uppercase”, letterSpacing: .5 }}>{g.category}</span>
+<div style={S.cardName}>{g.name}</div>
+{g.deadline && <div style={{ fontSize: 12, color: “#666”, marginBottom: 10 }}>Target: {fmt(g.deadline)}</div>}
+<div style={{ display: “flex”, alignItems: “center”, gap: 12, marginBottom: 8 }}>
+<div style={{ flex: 1, background: “#1e1e2a”, borderRadius: 6, height: 8, overflow: “hidden” }}>
+<div style={{ height: “100%”, width: `${pct}%`, background: done ? “#FF6B35” : “#a78bfa”, borderRadius: 6, transition: “width .6s” }} />
+</div>
+<span style={{ color: “#FF6B35”, fontWeight: 700, fontSize: 14 }}>{pct}%</span>
+</div>
+<div style={{ display: “flex”, alignItems: “center”, gap: 10 }}>
+<span style={{ fontSize: 12, color: “#666” }}>{g.current}{g.unit} / {g.target}{g.unit}</span>
+<div style={{ display: “flex”, gap: 8, marginLeft: “auto”, alignItems: “center” }}>
+<input type=“number” style={S.inlineInput} value={editing[g.id] ?? g.current} onChange={e => setEditing(p => ({ …p, [g.id]: e.target.value }))} />
+<button style={S.updateBtn} onClick={() => { if (editing[g.id] !== undefined) { onUpdate(g.id, editing[g.id]); setEditing(p => { const n={…p}; delete n[g.id]; return n; }); } }}>Update</button>
+<button style={S.iconBtn} onClick={() => onDelete(g.id)}><Icon n="trash" s={14} /></button>
+</div>
+</div>
+</div>
+);
+})}
+</div>
+);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════════════════════════════════════
+function Modal({ title, onClose, children }) {
+return (
+<div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+<div style={S.modalBox}>
+<div style={S.modalHeader}><span style={S.modalTitle}>{title}</span><button style={S.closeBtn} onClick={onClose}><Icon n="x" s={18} /></button></div>
+<div style={S.modalBody}>{children}</div>
+</div>
+</div>
+);
+}
+
+function WorkoutModal({ onClose, onSave }) {
+const [name, setName] = useState(””); const [date, setDate] = useState(today()); const [duration, setDuration] = useState(45);
+const [exercises, setExercises] = useState([{ name: “”, sets: [{ w: “”, r: “” }] }]);
+const addEx = () => setExercises(p => […p, { name: “”, sets: [{ w:””,r:”” }] }]);
+const addSet = (i) => setExercises(p => p.map((e,idx) => idx===i ? {…e, sets:[…e.sets,{w:””,r:””}]} : e));
+const updateEx = (i,f,v) => setExercises(p => p.map((e,idx) => idx===i ? {…e,[f]:v} : e));
+const updateSet = (ei,si,f,v) => setExercises(p => p.map((e,i) => i===ei ? {…e, sets:e.sets.map((s,j) => j===si ? {…s,[f]:v} : s)} : e));
+const removeEx = (i) => setExercises(p => p.filter((_,idx)=>idx!==i));
+const submit = () => { if (!name) return; onSave({ name, date, duration: Number(duration), exercises: exercises.filter(e=>e.name).map(e=>({name:e.name,sets:e.sets.map(s=>({w:Number(s.w)||0,r:Number(s.r)||0})).filter(s=>s.r>0)})).filter(e=>e.sets.length) }); };
+return (
+<Modal title="Log Workout" onClose={onClose}>
+<label style={S.label}>Workout Name</label><input style={S.input} value={name} onChange={e=>setName(e.target.value)} placeholder=“e.g. Push Day” />
+<div style={{display:“flex”,gap:12}}>
+<div style={{flex:1}}><label style={S.label}>Date</label><input style={S.input} type=“date” value={date} onChange={e=>setDate(e.target.value)} /></div>
+<div style={{flex:1}}><label style={S.label}>Duration (min)</label><input style={S.input} type=“number” value={duration} onChange={e=>setDuration(e.target.value)} /></div>
+</div>
+<div><div style={{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:10}}><span style={S.label}>Exercises</span><button style={S.smallBtn} onClick={addEx}>+ Add</button></div>
+{exercises.map((ex,i) => (
+<div key={i} style={{background:”#1a1a26”,borderRadius:12,padding:14,marginBottom:10}}>
+<div style={{display:“flex”,gap:8,marginBottom:8}}>
+<input style={{…S.input,flex:1,margin:0}} value={ex.name} onChange={e=>updateEx(i,“name”,e.target.value)} placeholder=“Exercise name” />
+{exercises.length>1 && <button style={S.iconBtn} onClick={()=>removeEx(i)}><Icon n="x" s={14}/></button>}
+</div>
+{ex.sets.map((s,j) => (
+<div key={j} style={{display:“grid”,gridTemplateColumns:“28px 1fr 1fr”,gap:8,marginBottom:8,alignItems:“center”}}>
+<span style={{fontSize:11,color:”#666”,fontWeight:700,textAlign:“center”}}>{j+1}</span>
+<input style={S.setInput} type=“number” value={s.w} onChange={e=>updateSet(i,j,“w”,e.target.value)} placeholder=“kg” />
+<input style={S.setInput} type=“number” value={s.r} onChange={e=>updateSet(i,j,“r”,e.target.value)} placeholder=“reps” />
+</div>
+))}
+<button style={S.smallBtn} onClick={()=>addSet(i)}>+ Set</button>
+</div>
+))}
+</div>
+<button style={S.saveBtn} onClick={submit}>Save Workout</button>
+</Modal>
+);
+}
+
+function NutritionModal({ onClose, onSave }) {
+const [date,setDate]=useState(today()); const [cal,setCal]=useState(””); const [pro,setPro]=useState(””); const [carb,setCarb]=useState(””); const [fat,setFat]=useState(””);
+const [meals,setMeals]=useState([{name:“Breakfast”,items:””}]);
+return (
+<Modal title="Log Nutrition" onClose={onClose}>
+<label style={S.label}>Date</label><input style={S.input} type=“date” value={date} onChange={e=>setDate(e.target.value)} />
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:10}}>
+{[[“Calories”,cal,setCal],[“Protein (g)”,pro,setPro],[“Carbs (g)”,carb,setCarb],[“Fat (g)”,fat,setFat]].map(([pl,v,set],i)=><input key={i} style={S.input} type=“number” value={v} onChange={e=>set(e.target.value)} placeholder={pl}/>)}
+</div>
+<div><div style={{display:“flex”,justifyContent:“space-between”,marginBottom:10}}><span style={S.label}>Meals</span><button style={S.smallBtn} onClick={()=>setMeals(p=>[…p,{name:””,items:””}])}>+ Add</button></div>
+{meals.map((m,i)=><div key={i} style={{background:”#1a1a26”,borderRadius:10,padding:12,marginBottom:8}}><input style={S.input} value={m.name} onChange={e=>setMeals(p=>p.map((x,idx)=>idx===i?{…x,name:e.target.value}:x))} placeholder=“Meal name”/><input style={S.input} value={m.items} onChange={e=>setMeals(p=>p.map((x,idx)=>idx===i?{…x,items:e.target.value}:x))} placeholder=“Items (comma separated)”/></div>)}
+</div>
+<button style={S.saveBtn} onClick={()=>onSave({date,calories:Number(cal),protein:Number(pro),carbs:Number(carb),fat:Number(fat),meals:meals.filter(m=>m.name).map(m=>({name:m.name,items:m.items.split(”,”).map(s=>s.trim()).filter(Boolean)}))})}>Save</button>
+</Modal>
+);
+}
+
+function StepsModal({ onClose, onSave }) {
+const [date,setDate]=useState(today()); const [steps,setSteps]=useState(””); const [goal,setGoal]=useState(10000);
+return (
+<Modal title="Log Steps" onClose={onClose}>
+<label style={S.label}>Date</label><input style={S.input} type=“date” value={date} onChange={e=>setDate(e.target.value)} />
+<label style={S.label}>Steps</label>
+<input style={{…S.input,fontSize:28,fontWeight:900,textAlign:“center”}} type=“number” value={steps} onChange={e=>setSteps(e.target.value)} placeholder=“0”/>
+<label style={S.label}>Daily Goal</label>
+<div style={{display:“flex”,gap:8,flexWrap:“wrap”,marginBottom:8}}>
+{[6000,8000,10000,12000,15000].map(p=><button key={p} style={{…S.smallBtn,…(Number(goal)===p?{borderColor:”#FF6B3566”,color:”#FF6B35”,background:”#FF6B3514”}:{}),padding:“7px 10px”}} onClick={()=>setGoal(p)}>{p.toLocaleString()}</button>)}
+</div>
+<input style={S.input} type=“number” value={goal} onChange={e=>setGoal(e.target.value)} placeholder=“Custom goal”/>
+{steps && <div style={{background:”#1a1a26”,borderRadius:12,padding:14,display:“flex”,gap:20}}><div style={{textAlign:“center”}}><div style={{color:”#4ecdc4”,fontWeight:800,fontSize:18}}>{stepsToKm(steps)}km</div><div style={{color:”#666”,fontSize:11}}>Distance</div></div><div style={{textAlign:“center”}}><div style={{color:”#ff6b6b”,fontWeight:800,fontSize:18}}>{stepsToCal(steps)}</div><div style={{color:”#666”,fontSize:11}}>Calories</div></div><div style={{textAlign:“center”}}><div style={{color:”#FF6B35”,fontWeight:800,fontSize:18}}>{Math.round(steps/goal*100)}%</div><div style={{color:”#666”,fontSize:11}}>of goal</div></div></div>}
+<button style={S.saveBtn} onClick={()=>{if(steps)onSave({date,steps:Number(steps),goal:Number(goal)})}}>Save Steps</button>
+</Modal>
+);
+}
+
+function SupplementModal({ onClose, onSave }) {
+const [name,setName]=useState(””); const [dose,setDose]=useState(””); const [timing,setTiming]=useState(“Morning”); const [color,setColor]=useState(”#4ecdc4”);
+const presets=[{name:“Creatine”,dose:“5g”,timing:“Post-workout”},{name:“Whey Protein”,dose:“30g”,timing:“Post-workout”},{name:“Vitamin D3”,dose:“2000 IU”,timing:“Morning”},{name:“Omega-3”,dose:“1g”,timing:“With meals”},{name:“Magnesium”,dose:“400mg”,timing:“Evening”},{name:“Zinc”,dose:“15mg”,timing:“Morning”},{name:“Caffeine”,dose:“200mg”,timing:“Pre-workout”},{name:“Beta-Alanine”,dose:“3.2g”,timing:“Pre-workout”}];
+const timings=[“Morning”,“Pre-workout”,“Post-workout”,“With meals”,“Evening”,“Before bed”];
+const colors=[”#4ecdc4”,”#FF6B35”,”#ff6b6b”,”#a78bfa”,”#ffd93d”,”#ff9f43”,”#06d6a0”,”#0652DD”];
+return (
+<Modal title="Add Supplement" onClose={onClose}>
+<label style={S.label}>Quick Add</label>
+<div style={{display:“flex”,flexWrap:“wrap”,gap:8}}>{presets.map((p,i)=><button key={i} style={{…S.smallBtn,fontSize:12}} onClick={()=>{setName(p.name);setDose(p.dose);setTiming(p.timing)}}>{p.name}</button>)}</div>
+<label style={S.label}>Name</label><input style={S.input} value={name} onChange={e=>setName(e.target.value)} placeholder=“e.g. Creatine”/>
+<label style={S.label}>Dose</label><input style={S.input} value={dose} onChange={e=>setDose(e.target.value)} placeholder=“e.g. 5g”/>
+<label style={S.label}>Timing</label>
+<div style={{display:“flex”,flexWrap:“wrap”,gap:8}}>{timings.map(t=><button key={t} style={{…S.smallBtn,…(timing===t?{borderColor:”#FF6B3566”,color:”#FF6B35”,background:”#FF6B3514”}:{}),padding:“7px 12px”}} onClick={()=>setTiming(t)}>{t}</button>)}</div>
+<label style={S.label}>Colour</label>
+<div style={{display:“flex”,gap:10}}>{colors.map(c=><div key={c} onClick={()=>setColor(c)} style={{width:30,height:30,borderRadius:“50%”,background:c,cursor:“pointer”,border:color===c?“3px solid #fff”:“3px solid transparent”,transition:“border .15s”}}/>)}</div>
+<button style={S.saveBtn} onClick={()=>{if(name&&dose)onSave({name,dose,timing,color,active:true})}}>Add Supplement</button>
+</Modal>
+);
+}
+
+function GoalModal({ onClose, onSave }) {
+const [name,setName]=useState(””); const [target,setTarget]=useState(””); const [current,setCurrent]=useState(””); const [unit,setUnit]=useState(“kg”); const [category,setCategory]=useState(“strength”); const [deadline,setDeadline]=useState(””);
+return (
+<Modal title="Add Goal" onClose={onClose}>
+<label style={S.label}>Goal Name</label><input style={S.input} value={name} onChange={e=>setName(e.target.value)} placeholder=“e.g. Bench Press 100kg”/>
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:10}}>
+<div><label style={S.label}>Target</label><input style={S.input} type=“number” value={target} onChange={e=>setTarget(e.target.value)} placeholder=“100”/></div>
+<div><label style={S.label}>Current</label><input style={S.input} type=“number” value={current} onChange={e=>setCurrent(e.target.value)} placeholder=“0”/></div>
+<div><label style={S.label}>Unit</label><input style={S.input} value={unit} onChange={e=>setUnit(e.target.value)} placeholder=“kg/g/reps”/></div>
+<div><label style={S.label}>Deadline</label><input style={S.input} type=“date” value={deadline} onChange={e=>setDeadline(e.target.value)}/></div>
+</div>
+<label style={S.label}>Category</label>
+<div style={{display:“flex”,gap:8,flexWrap:“wrap”}}>
+{[“strength”,“nutrition”,“cardio”,“body”].map(c=><button key={c} style={{…S.smallBtn,…(category===c?{borderColor:”#FF6B3566”,color:”#FF6B35”,background:”#FF6B3514”}:{}),padding:“8px 14px”}} onClick={()=>setCategory(c)}>{c}</button>)}
+</div>
+<button style={S.saveBtn} onClick={()=>{if(name&&target)onSave({name,target:Number(target),current:Number(current)||0,unit,category,deadline})}}>Save Goal</button>
+</Modal>
+);
+}
+
+function CheckinModal({ onClose, onSave }) {
+const [date,setDate]=useState(today()); const [type,setType]=useState(“weekly”);
+const [mood,setMood]=useState(3); const [energy,setEnergy]=useState(3); const [weight,setWeight]=useState(””);
+const [compliance,setCompliance]=useState(””); const [notes,setNotes]=useState(””);
+const [chest,setChest]=useState(””); const [waist,setWaist]=useState(””); const [hips,setHips]=useState(””);
+return (
+<Modal title="Submit Check-in" onClose={onClose}>
+<div style={{display:“flex”,gap:8}}>
+{[“daily”,“weekly”].map(t=><button key={t} style={{…S.smallBtn,…(type===t?{borderColor:”#FF6B3566”,color:”#FF6B35”,background:”#FF6B3514”}:{}),flex:1,padding:“10px”}} onClick={()=>setType(t)}>{t.charAt(0).toUpperCase()+t.slice(1)} Check-in</button>)}
+</div>
+<label style={S.label}>Date</label><input style={S.input} type=“date” value={date} onChange={e=>setDate(e.target.value)}/>
+<label style={S.label}>Mood (1–5)</label>
+<div style={{display:“flex”,gap:8}}>{[1,2,3,4,5].map(n=><button key={n} style={{flex:1,padding:“12px”,borderRadius:10,border:`2px solid ${n<=mood?"#FF6B35":"#2a2a3a"}`,background:n<=mood?”#FF6B3522”:“transparent”,color:n<=mood?”#FF6B35”:”#555”,cursor:“pointer”,fontSize:16}} onClick={()=>setMood(n)}>★</button>)}</div>
+<label style={S.label}>Energy (1–5)</label>
+<div style={{display:“flex”,gap:8}}>{[1,2,3,4,5].map(n=><button key={n} style={{flex:1,padding:“12px”,borderRadius:10,border:`2px solid ${n<=energy?"#ffd93d":"#2a2a3a"}`,background:n<=energy?”#ffd93d22”:“transparent”,color:n<=energy?”#ffd93d”:”#555”,cursor:“pointer”,fontSize:16}} onClick={()=>setEnergy(n)}>⚡</button>)}</div>
+<label style={S.label}>Current Weight (kg)</label><input style={S.input} type=“number” value={weight} onChange={e=>setWeight(e.target.value)} placeholder=“e.g. 82.5”/>
+<label style={S.label}>Workout Compliance</label><input style={S.input} value={compliance} onChange={e=>setCompliance(e.target.value)} placeholder=“e.g. 3/4 workouts completed”/>
+<label style={S.label}>Notes to Coach Lawton</label><textarea style={{…S.input,minHeight:80,resize:“vertical”}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder=“How’s it going? Any issues? Energy levels? Sleep?”/>
+{type===“weekly” && <>
+<label style={S.label}>Measurements (cm)</label>
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr 1fr”,gap:10}}>
+{[[“Chest”,chest,setChest],[“Waist”,waist,setWaist],[“Hips”,hips,setHips]].map(([pl,v,set],i)=><input key={i} style={S.input} type=“number” value={v} onChange={e=>set(e.target.value)} placeholder={pl}/>)}
+</div>
+</>}
+<button style={{…S.saveBtn,background:”#FF6B35”}} onClick={()=>onSave({date,type,mood,energy,weight:Number(weight)||0,compliance,notes,measurements:type===“weekly”&&(chest||waist||hips)?{…(chest?{chest:Number(chest)}:{}),..  (waist?{waist:Number(waist)}:{}),..  (hips?{hips:Number(hips)}:{})}:null})}>Submit Check-in</button>
+</Modal>
+);
+}
+
+function AddClientModal({ onClose, onSave }) {
+const [name,setName]=useState(””); const [email,setEmail]=useState(””); const [goal,setGoal]=useState(””); const [pin,setPin]=useState(””);
+return (
+<Modal title="Add New Client" onClose={onClose}>
+<label style={S.label}>Full Name</label><input style={S.input} value={name} onChange={e=>setName(e.target.value)} placeholder=“e.g. Jamie Clarke”/>
+<label style={S.label}>Email</label><input style={S.input} value={email} onChange={e=>setEmail(e.target.value)} placeholder=“jamie@email.com” type=“email”/>
+<label style={S.label}>Goal</label><input style={S.input} value={goal} onChange={e=>setGoal(e.target.value)} placeholder=“e.g. Build muscle & strength”/>
+<label style={S.label}>Client PIN (4 digits)</label><input style={{…S.input,letterSpacing:8,fontSize:22,textAlign:“center”}} type=“number” value={pin} onChange={e=>setPin(e.target.value.slice(0,4))} placeholder=”••••” maxLength={4}/>
+<div style={{background:”#1a1a26”,borderRadius:10,padding:12,fontSize:12,color:”#888”}}>Share this PIN with your client so they can log in to their account.</div>
+<button style={S.saveBtn} onClick={()=>{if(name&&pin.length===4)onSave({name,email,goal,pin,status:“active”})}}>Add Client</button>
+</Modal>
+);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getGreeting() { const h=new Date().getHours(); return h<12?“morning”:h<17?“afternoon”:“evening”; }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const S = {
+app: { background: “#0a0a0f”, minHeight: “100vh”, color: “#e8e8e8”, fontFamily: “‘DM Sans’,‘Helvetica Neue’,sans-serif”, paddingBottom: 120 },
+pinScreen: { background: “#0a0a0f”, minHeight: “100vh”, display: “flex”, alignItems: “center”, justifyContent: “center”, padding: “20px 16px”, fontFamily: “‘DM Sans’,‘Helvetica Neue’,sans-serif” },
+pinBox: { width: “100%”, maxWidth: 380, display: “flex”, flexDirection: “column”, alignItems: “center”, gap: 6 },
+brandName: { fontSize: 22, fontWeight: 900, color: “#fff”, letterSpacing: 4, textAlign: “center” },
+brandNameSmall: { fontSize: 14, fontWeight: 900, color: “#fff”, letterSpacing: 2 },
+brandTagline: { fontSize: 13, color: “#555”, letterSpacing: 1 },
+pinLabel: { fontSize: 13, color: “#888”, fontWeight: 700, letterSpacing: 1, textTransform: “uppercase”, marginBottom: 16, textAlign: “center”, width: “100%” },
+pinDivider: { color: “#444”, fontSize: 12, textAlign: “center”, margin: “10px 0”, width: “100%” },
+loginTypeBtn: { width: “100%”, background: “#12121a”, border: “1px solid #222”, borderRadius: 14, padding: “14px 16px”, display: “flex”, alignItems: “center”, gap: 14, cursor: “pointer”, marginBottom: 8, textAlign: “left” },
+loginTypeBtnIcon: { width: 42, height: 42, borderRadius: 12, background: “#FF6B3522”, border: “1px solid #FF6B3544”, display: “flex”, alignItems: “center”, justifyContent: “center”, color: “#FF6B35”, flexShrink: 0 },
+pinDots: { display: “flex”, gap: 14, marginBottom: 12 },
+pinDot: { width: 16, height: 16, borderRadius: “50%”, transition: “background .15s” },
+pinError: { color: “#ff6b6b”, fontSize: 13, marginBottom: 10 },
+numPad: { display: “grid”, gridTemplateColumns: “repeat(3, 1fr)”, gap: 10, width: “100%”, maxWidth: 280 },
+numBtn: { background: “#12121a”, border: “1px solid #222”, borderRadius: 14, padding: “18px”, fontSize: 22, fontWeight: 700, color: “#fff”, cursor: “pointer”, transition: “background .1s” },
+backBtn: { display: “flex”, alignItems: “center”, gap: 6, background: “none”, border: “none”, color: “#888”, cursor: “pointer”, fontSize: 13, fontWeight: 600, marginBottom: 16, alignSelf: “flex-start” },
+header: { padding: “18px 18px 0”, display: “flex”, justifyContent: “space-between”, alignItems: “center” },
+backBtnHeader: { background: “#1a1a26”, border: “1px solid #222”, borderRadius: 10, padding: “8px”, color: “#888”, cursor: “pointer”, display: “flex”, alignItems: “center”, justifyContent: “center” },
+logoutBtn: { background: “#1a1a26”, border: “1px solid #222”, borderRadius: 10, padding: “8px 10px”, color: “#888”, cursor: “pointer” },
+nav: { display: “flex”, gap: 2, padding: “12px 12px 0”, overflowX: “auto”, scrollbarWidth: “none” },
+navBtn: { display: “flex”, flexDirection: “column”, alignItems: “center”, gap: 3, padding: “8px 9px”, borderRadius: 11, border: “none”, background: “transparent”, color: “#555”, cursor: “pointer”, fontSize: 9, fontWeight: 700, letterSpacing: .5, textTransform: “uppercase”, minWidth: 46, transition: “all .2s”, whiteSpace: “nowrap” },
+navBtnActive: { background: “#FF6B3518”, color: “#FF6B35”, border: “1px solid #FF6B3533” },
+main: { padding: “18px 16px” },
+section: { maxWidth: 600, margin: “0 auto” },
+pageTitle: { fontSize: 24, fontWeight: 800, color: “#fff”, letterSpacing: -1, marginBottom: 16 },
+sectionLabel: { fontSize: 11, color: “#888”, fontWeight: 700, letterSpacing: 1, textTransform: “uppercase”, marginBottom: 0 },
+card: { background: “#12121a”, border: “1px solid #1e1e2a”, borderRadius: 16, padding: 18, marginBottom: 12 },
+cardDate: { fontSize: 11, color: “#888”, fontWeight: 700, letterSpacing: 1, textTransform: “uppercase”, marginBottom: 4 },
+cardName: { fontSize: 16, fontWeight: 700, color: “#fff”, marginBottom: 4 },
+avatar: { width: 42, height: 42, borderRadius: 12, display: “flex”, alignItems: “center”, justifyContent: “center”, fontSize: 14, fontWeight: 800, color: “#fff”, flexShrink: 0 },
+addBtn: { display: “flex”, alignItems: “center”, gap: 6, background: “#FF6B3522”, border: “1px solid #FF6B3566”, borderRadius: 10, padding: “7px 14px”, color: “#FF6B35”, cursor: “pointer”, fontSize: 12, fontWeight: 700 },
+actionBtn: { display: “flex”, alignItems: “center”, gap: 6, background: “#1a1a26”, border: “1px solid #2a2a3a”, borderRadius: 10, padding: “8px 14px”, color: “#ccc”, cursor: “pointer”, fontSize: 12, fontWeight: 600 },
+deleteBtn: { display: “flex”, alignItems: “center”, gap: 6, background: “#ff6b6b18”, border: “1px solid #ff6b6b44”, borderRadius: 10, padding: “8px 14px”, color: “#ff6b6b”, cursor: “pointer”, fontSize: 12, fontWeight: 600, marginTop: 12 },
+empty: { color: “#555”, textAlign: “center”, padding: “40px 0”, fontSize: 14 },
+fab: { position: “fixed”, bottom: 90, right: 24, width: 56, height: 56, borderRadius: “50%”, background: “#FF6B35”, border: “none”, color: “#fff”, cursor: “pointer”, display: “flex”, alignItems: “center”, justifyContent: “center”, boxShadow: “0 4px 24px #FF6B3566”, zIndex: 100 },
+qaBtn: { display: “flex”, alignItems: “center”, gap: 10, padding: “14px 16px”, background: “#12121a”, border: “1px solid #1e1e2a”, borderRadius: 14, color: “#ccc”, cursor: “pointer”, fontSize: 13, fontWeight: 600 },
+inlineInput: { width: 72, background: “#1e1e2a”, border: “1px solid #333”, borderRadius: 8, padding: “6px 8px”, color: “#fff”, fontSize: 13 },
+updateBtn: { background: “#FF6B3522”, border: “1px solid #FF6B3566”, borderRadius: 8, padding: “6px 12px”, color: “#FF6B35”, cursor: “pointer”, fontSize: 12, fontWeight: 700 },
+iconBtn: { background: “#1e1e2a”, border: “1px solid #333”, borderRadius: 8, padding: “6px 8px”, color: “#888”, cursor: “pointer” },
+overlay: { position: “fixed”, inset: 0, background: “#000b”, backdropFilter: “blur(8px)”, zIndex: 200, display: “flex”, alignItems: “flex-end”, justifyContent: “center” },
+modalBox: { background: “#13131c”, border: “1px solid #222”, borderRadius: “22px 22px 0 0”, width: “100%”, maxWidth: 560, maxHeight: “92vh”, overflow: “hidden”, display: “flex”, flexDirection: “column” },
+modalHeader: { display: “flex”, justifyContent: “space-between”, alignItems: “center”, padding: “18px 20px 14px”, borderBottom: “1px solid #1e1e2a” },
+modalTitle: { fontSize: 17, fontWeight: 800, color: “#fff” },
+closeBtn: { background: “#1e1e2a”, border: “none”, borderRadius: 10, padding: “6px 8px”, color: “#888”, cursor: “pointer” },
+modalBody: { padding: “14px 18px 36px”, overflowY: “auto”, display: “flex”, flexDirection: “column”, gap: 12 },
+label: { fontSize: 11, fontWeight: 700, color: “#888”, letterSpacing: 1, textTransform: “uppercase”, marginBottom: 4, display: “block” },
+input: { width: “100%”, background: “#1e1e2a”, border: “1px solid #2a2a3a”, borderRadius: 10, padding: “12px 14px”, color: “#fff”, fontSize: 15, boxSizing: “border-box”, outline: “none” },
+setInput: { background: “#0a0a0f”, border: “1px solid #2a2a3a”, borderRadius: 8, padding: “10px”, color: “#fff”, fontSize: 14, outline: “none”, textAlign: “center”, width: “100%”, boxSizing: “border-box” },
+smallBtn: { background: “transparent”, border: “1px solid #2a2a3a”, borderRadius: 8, padding: “6px 12px”, color: “#888”, cursor: “pointer”, fontSize: 12 },
+saveBtn: { background: “#FF6B35”, border: “none”, borderRadius: 14, padding: “14px”, color: “#fff”, fontSize: 16, fontWeight: 900, cursor: “pointer”, letterSpacing: .5, marginTop: 8 },
+};
+
+const css = `
+@import url(‘https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800;900&display=swap’);
+
+- { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  .card { transition: transform .15s, border-color .15s; }
+  .card:active { transform: scale(.99); }
+  .card:hover { border-color: #2a2a3a !important; }
+  .fab { transition: transform .15s, box-shadow .15s; }
+  .fab:hover { transform: scale(1.08); }
+  .fab:active { transform: scale(.95); }
+  .qaBtn:hover { background: #1a1a26 !important; color: #fff !important; }
+  input[type=“number”]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type=“date”]::-webkit-calendar-picker-indicator { filter: invert(.5); }
+  input:focus { border-color: #FF6B3566 !important; }
+  textarea { font-family: ‘DM Sans’, sans-serif; }
+  `;
+
+  </script>
+
+  <!-- Service Worker -->
+
+  <script>
+    if('serviceWorker' in navigator){
+      window.addEventListener('load',function(){
+        navigator.serviceWorker.register('sw.js')
+          .then(function(r){console.log('SW ok',r.scope);})
+          .catch(function(e){console.log('SW skip',e);});
+      });
+    }
+  </script>
+
+</body>
 </html>
