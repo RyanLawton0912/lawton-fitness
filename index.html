@@ -447,9 +447,10 @@ function openWorkoutModal(){
 function renderWModal(name,date,dur,isEdit){
   var b=document.getElementById('mb-workout');
   var saveLabel=isEdit?'Save Changes':'Save Workout';
-  b.innerHTML='<div class="field"><label class="lbl">Workout Name</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+(name||'")+'"/></div><div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div><div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label><div style="display:flex;gap:8px"><button class="btn-sm" onclick="addEx(\'strength\')">+ Strength</button><button class="btn-sm" onclick="addEx(\'cardio\')">+ Cardio</button></div></div><div id="wexs"></div><button class="btn-primary" onclick="saveWorkout('+(isEdit?'true':'false')+'">'+saveLabel+'</button>';
+  b.innerHTML='<div class="field"><label class="lbl">Workout Name</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+( name||'')+'"/></div><div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div><div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label><div style="display:flex;gap:8px"><button class="btn-sm" onclick="addEx(\'strength\')">+ Strength</button><button class="btn-sm" onclick="addEx(\'cardio\')">+ Cardio</button></div></div><div id="wexs"></div><button class="btn-primary" onclick="saveWorkout('+(isEdit?'true':'false')+')">' +saveLabel+'</button>';
   renderExs();
 }
+
 function renderExs(){
   var c=document.getElementById('wexs');if(!c)return;
   var h='';
@@ -500,8 +501,8 @@ function saveWorkout(isEdit){
   }else{
     W.unshift({id:gid(),date:date,name:name,duration:dur,exercises:exercises});
     var T=DB.get('templates')||[];
-T.push({id:gid(),name:name,duration:dur,exercises:exercises});
-DB.set('templates',T);
+    T.push({id:gid(),name:name,duration:dur,exercises:exercises});
+    DB.set('templates',T);
   }
   DB.set('workouts',W);
   cm('mo-workout');
