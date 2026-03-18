@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 192 192">
- <rect width="192" height="192" fill="#0a0a0f" rx="38"/>
- <polygon points="96,16 172,58 172,134 96,176 20,134 20,58" fill="#FF6B35" opacity="0.15"/>
- <polygon points="96,16 172,58 172,134 96,176 20,134 20,58" fill="none" stroke="#FF6B35" str <polygon points="96,38 150,69 150,123 96,154 42,123 42,69" fill="#FF6B35" opacity="0.2"/>
- <polygon points="96,58 134,80 134,112 96,134 58,112 58,80" fill="#FF6B35" opacity="0.3"/>
- <text x="96" y="118" text-anchor="middle" fill="#FF6B35" font-size="58" font-weight="900" f</svg>
