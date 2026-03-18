@@ -498,24 +498,38 @@ function saveWorkout(){
   var date=document.getElementById('wd').value;
   var dur=Number(document.getElementById('wt').value)||45;
   if(!name){alert('Please enter a workout name');return;}
-  var exercises=wEx.filter(function(e){return e.name.trim();}).map(function(e){
-    if(e.type==='cardio')return{name:e.name,type:'cardio',duration:e.duration||0,cardioType:e.cardioType||'',bpm:e.bpm||0};
-    return{name:e.name.trim(),type:'strength',sets:e.sets.filter(function(s){return s.r>0;}).map(function(s){return{w:s.w||0,r:s.r};})};
-  }).filter(function(e){return e.type==='cardio'||(e.sets&&e.sets.length);});
-  if(!exercises.length){alert('Please add at least one exercise');return;}
+  var exercises=[];
+  for(var i=0;i<wEx.length;i++){
+    var ex=wEx[i];
+    if(!ex.name.trim())continue;
+    if(ex.type==='cardio'){
+      exercises.push({name:ex.name,type:'cardio',duration:ex.duration||0,cardioType:ex.cardioType||'',bpm:ex.bpm||0});
+    }else{
+      var sets=[];
+      for(var j=0;j<ex.sets.length;j++){
+        var r=Number(ex.sets[j].r)||0;
+        if(r>0)sets.push({w:Number(ex.sets[j].w)||0,r:r});
+      }
+      if(sets.length>0)exercises.push({name:ex.name.trim(),type:'strength',sets:sets});
+    }
+  }
+  if(exercises.length===0){alert('Please add at least one exercise with sets');return;}
   var W=DB.get('workouts')||[];
-  alert('DEBUG: exercises='+exercises.length+' editCtx.id='+editCtx.id+' W before='+W.length);
-  if(editCtx.id){
-    W=W.map(function(w){return w.id===editCtx.id?{id:w.id,date:date,name:name,duration:dur,exercises:exercises}:w;});
+  var editId=editCtx&&editCtx.id?editCtx.id:null;
+  if(editId){
+    for(var k=0;k<W.length;k++){
+      if(W[k].id===editId){W[k]={id:editId,date:date,name:name,duration:dur,exercises:exercises};break;}
+    }
   }else{
-    W.unshift({id:gid(),date:date,name:name,duration:dur,exercises:exercises});
+    var newW={id:gid(),date:date,name:name,duration:dur,exercises:exercises};
+    W.unshift(newW);
     var T=DB.get('templates')||[];
     T.push({id:gid(),name:name,duration:dur,exercises:exercises});
     DB.set('templates',T);
   }
   DB.set('workouts',W);
-  cm('mo-workout');
   editCtx={};
+  cm('mo-workout');
   renderPage();
 }
 
