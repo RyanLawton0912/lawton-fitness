@@ -195,7 +195,7 @@ window.addEventListener('unhandledrejection',function(e){var d=document.getEleme
 <div class="modal-overlay" id="mo-supplement"><div class="modal-box"><div class="modal-header"><span class="modal-title">Add Supplement</span><button class="btn-icon" onclick="cm('mo-supplement')">x</button></div><div class="modal-body" id="mb-supplement"></div></div></div>
 <div class="modal-overlay" id="mo-goal"><div class="modal-box"><div class="modal-header"><span class="modal-title">Add Goal</span><button class="btn-icon" onclick="cm('mo-goal')">x</button></div><div class="modal-body" id="mb-goal"></div></div></div>
 <script>
-var DB={get:function(k){try{var v=localStorage.getItem('lf:'+k);return v?JSON.parse(v):null;}catch(e){return null;}},set:function(k,v){try{localStorage.setItem('lf:'+k,JSON.stringify(v));}catch(e){console.error(e);}},del:function(k){localStorage.removeItem('lf:'+k);}};
+document.body.style.background='red';var DB={get:function(k){try{var v=localStorage.getItem('lf:'+k);return v?JSON.parse(v):null;}catch(e){return null;}},set:function(k,v){try{localStorage.setItem('lf:'+k,JSON.stringify(v));}catch(e){console.error(e);}},del:function(k){localStorage.removeItem('lf:'+k);}};
 var gid=function(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);};
 var today=function(){return new Date().toISOString().split('T')[0];};
 var fmtDate=function(d){if(!d)return'';var dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});};
