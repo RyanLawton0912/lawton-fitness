@@ -441,93 +441,170 @@ function editWorkout(id){
 }
 function openTemplateModal(){
   var T=DB.get('templates')||[];
-  var h='<button class="btn-primary" onclick="startFromTemplate()" style="margin-bottom:4px">+ Save Current as Template</button>';
-  if(!T.length){h+='<div class="empty-state" style="padding:32px 0"><div class="empty-text">No templates yet</div><div class="empty-sub">Log a workout then save it as a template</div></div>';}
-  else{T.forEach(function(t){h+='<div class="tpl-card" onclick="loadTemplate(\''+t.id+'\')"><div><div style="font-size:15px;font-weight:700">'+t.name+'</div><div style="font-size:12px;color:var(--text3);margin-top:3px">'+t.exercises.length+' exercises</div></div><button class="btn-danger" style="margin:0" onclick="event.stopPropagation();delTemplate(\''+t.id+'\')">Del</button></div>';});}
+  var h='';
+  h+='<button class="btn-primary" style="margin-bottom:4px" onclick="openNewTemplateModal()">+ Create New Template</button>';
+  if(!T.length){
+    h+='<div class="empty-state" style="padding:32px 0"><span class="empty-icon">&#x1F4CB;</span><div class="empty-text">No templates yet</div><div class="empty-sub">Create a template to reuse workouts</div></div>';
+  }else{
+    T.forEach(function(t){
+      h+='<div class="tpl-card"><div><div style="font-size:15px;font-weight:700">'+t.name+'</div><div style="font-size:12px;color:var(--text3);margin-top:3px">'+t.exercises.length+' exercises</div></div>';
+      h+='<div style="display:flex;gap:8px"><button class="btn-ghost" style="font-size:12px;padding:6px 12px" onclick="editTemplate(\u0027"+t.id+"\u0027)">Edit</button>';
+      h+='<button class="btn-danger" style="margin:0" onclick="delTemplate(\u0027"+t.id+"\u0027)">Del</button></div></div>';
+    });
+  }
   document.getElementById('mb-template').innerHTML=h;
   om('mo-template');
 }
-function loadTemplate(id){
+
+function openNewTemplateModal(){
+  cm('mo-template');
+  wEx=[{name:'',type:'strength',sets:[{w:'',r:''}]}];
+  editCtx={type:'template'};
+  renderWModal('',null,null,false,true);
+  om('mo-workout');
+}
+
+function editTemplate(id){
   var T=DB.get('templates')||[];
   var t=T.find(function(x){return x.id===id;});
   if(!t)return;
   cm('mo-template');
   wEx=JSON.parse(JSON.stringify(t.exercises));
-  renderWModal(t.name,today(),t.duration||45);
+  editCtx={type:'template',id:id};
+  renderWModal(t.name,null,null,false,true);
   om('mo-workout');
 }
-function delTemplate(id){if(!confirm('Delete template?'))return;DB.set('templates',(DB.get('templates')||[]).filter(function(t){return t.id!==id;}));openTemplateModal();}
-function startFromTemplate(){cm('mo-template');openWorkoutModal();}
+
+function delTemplate(id){
+  if(!confirm('Delete this template?'))return;
+  DB.set('templates',(DB.get('templates')||[]).filter(function(t){return t.id!==id;}));
+  openTemplateModal();
+}
+
 function getLastSets(exName){
   var W=(DB.get('workouts')||[]).slice().sort(function(a,b){return b.date.localeCompare(a.date);});
-  for(var i=0;i<W.length;i++){var ex=W[i].exercises.find(function(e){return e.name===exName;});if(ex&&ex.sets&&ex.sets.length)return ex.sets;}
+  for(var i=0;i<W.length;i++){
+    var ex=W[i].exercises.find(function(e){return e.name===exName;});
+    if(ex&&ex.sets&&ex.sets.length)return ex.sets;
+  }
   return null;
 }
+
 function openWorkoutModal(){
-  editCtx={};
   wEx=[{name:'',type:'strength',sets:[{w:'',r:''}]}];
-  renderWModal('',today(),45,false);
+  editCtx={type:'workout'};
+  renderWModal('',today(),45,false,false);
   om('mo-workout');
 }
-function renderWModal(name,date,dur,isEdit){
+
+function editWorkout(id){
+  var W=DB.get('workouts')||[];
+  var w=W.find(function(x){return x.id===id;});
+  if(!w)return;
+  wEx=JSON.parse(JSON.stringify(w.exercises));
+  editCtx={type:'workout',id:id};
+  renderWModal(w.name,w.date,w.duration,true,false);
+  om('mo-workout');
+}
+
+function copyWorkout(id){
+  var W=DB.get('workouts')||[];
+  var w=W.find(function(x){return x.id===id;});
+  if(!w)return;
+  wEx=JSON.parse(JSON.stringify(w.exercises));
+  editCtx={type:'workout'};
+  renderWModal(w.name+' (copy)',today(),w.duration,false,false);
+  om('mo-workout');
+}
+
+function renderWModal(name,date,dur,isEdit,isTemplate){
   var b=document.getElementById('mb-workout');
-  var saveLabel=isEdit?'Save Changes':'Save Workout';
+  var T=DB.get('templates')||[];
+  var saveLabel=isTemplate?'Save Template':(isEdit?'Save Changes':'Save Workout');
+  var titleLabel=isTemplate?'Template Name':'Workout Name';
+  var html='';
+  html+='<div style="background:var(--bg3);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:'+(isTemplate?'var(--purple)':'var(--blue)')+';margin-bottom:4px;text-align:center">'+(isTemplate?'TEMPLATE MODE - not logged as workout':'LOG WORKOUT')+'</div>';
+  html+='<div class="field"><label class="lbl">'+titleLabel+'</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+(name||'')+'"/></div>';
+  if(!isTemplate){
+    if(T.length){
+      html+='<div class="field"><label class="lbl">Load from Template</label>';
+      html+='<select class="inp" id="w-tpl-sel" onchange="loadTemplateIntoForm(this.value)">';
+      html+='<option value="">-- Start from scratch --</option>';
+      T.forEach(function(t){html+='<option value="'+t.id+'">'+t.name+'</option>';});
+      html+='</select></div>';
+    }
+    html+='<div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div>';
+    html+='<div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div>';
+  }
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  html+='<label class="lbl" style="margin:0">Exercises</label>';
   var strBtn='<button class="btn-sm" onclick="addEx(\u0027strength\u0027)">+ Strength</button>';
   var carBtn='<button class="btn-sm" onclick="addEx(\u0027cardio\u0027)">+ Cardio</button>';
-  var html='';
-  html+='<div class="field"><label class="lbl">Workout Name</label><input class="inp" id="wn" placeholder="e.g. Push Day" value="'+(name||'')+'"/></div>';
-  html+='<div class="field"><label class="lbl">Date</label><input class="inp" type="date" id="wd" value="'+(date||today())+'"/></div>';
-  html+='<div class="field"><label class="lbl">Duration (min)</label><input class="inp" type="number" id="wt" value="'+(dur||45)+'"/></div>';
-  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="lbl" style="margin:0">Exercises</label><div style="display:flex;gap:8px">'+strBtn+carBtn+'</div></div>';
+  html+='<div style="display:flex;gap:8px">'+strBtn+carBtn+'</div></div>';
   html+='<div id="wexs"></div>';
   html+='<button class="btn-primary" onclick="saveWorkout()">'+saveLabel+'</button>';
   b.innerHTML=html;
   renderExs();
 }
 
+function loadTemplateIntoForm(tplId){
+  if(!tplId)return;
+  var T=DB.get('templates')||[];
+  var t=T.find(function(x){return x.id===tplId;});
+  if(!t)return;
+  wEx=JSON.parse(JSON.stringify(t.exercises));
+  renderExs();
+}
+
 function renderExs(){
   var c=document.getElementById('wexs');if(!c)return;
-  var h='';
+  var html='';
   wEx.forEach(function(ex,i){
-    h+='<div class="ex-block">';
-    h+='<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">';
-    h+='<input class="inp" style="flex:1" placeholder="'+(ex.type==='cardio'?'Cardio type e.g. Run':'Exercise name')+'" value="'+(ex.name||'')+'" oninput="wEx['+i+'].name=this.value"/>';
-    h+='<span style="font-size:10px;background:var(--bg4);padding:4px 8px;border-radius:6px;color:var(--text3);white-space:nowrap">'+ex.type+'</span>';
-    if(wEx.length>1)h+='<button class="btn-icon" onclick="remEx('+i+')" style="flex-shrink:0">&#x2715;</button>';
-    h+='</div>';
+    html+='<div class="ex-block">';
+    html+='<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">';
+    html+='<input class="inp" style="flex:1" placeholder="'+(ex.type==='cardio'?'e.g. Run':'Exercise name')+'" value="'+(ex.name||'')+'" oninput="wEx['+i+'].name=this.value"/>';
+    html+='<span style="font-size:10px;background:var(--bg4);padding:4px 8px;border-radius:6px;color:var(--text3)">'+ex.type+'</span>';
+    if(wEx.length>1)html+='<button class="btn-icon" onclick="remEx('+i+')" style="flex-shrink:0">&#x2715;</button>';
+    html+='</div>';
     if(ex.type==='cardio'){
-      h+='<div class="inp3"><div class="field"><label class="lbl">Duration(min)</label><input class="sinp" type="number" placeholder="30" value="'+(ex.duration||'')+'" oninput="wEx['+i+'].duration=Number(this.value)"/></div>';
-      h+='<div class="field"><label class="lbl">Type</label><input class="sinp" placeholder="Run/Bike/Row" value="'+(ex.cardioType||'')+'" oninput="wEx['+i+'].cardioType=this.value"/></div>';
-      h+='<div class="field"><label class="lbl">Avg BPM</label><input class="sinp" type="number" placeholder="140" value="'+(ex.bpm||'')+'" oninput="wEx['+i+'].bpm=Number(this.value)"/></div></div>';
+      html+='<div class="inp3">';
+      html+='<div class="field"><label class="lbl">Mins</label><input class="sinp" type="number" placeholder="30" value="'+(ex.duration||'')+'" oninput="wEx['+i+'].duration=Number(this.value)"/></div>';
+      html+='<div class="field"><label class="lbl">Type</label><input class="sinp" placeholder="Run/Bike" value="'+(ex.cardioType||'')+'" oninput="wEx['+i+'].cardioType=this.value"/></div>';
+      html+='<div class="field"><label class="lbl">BPM</label><input class="sinp" type="number" placeholder="140" value="'+(ex.bpm||'')+'" oninput="wEx['+i+'].bpm=Number(this.value)"/></div>';
+      html+='</div>';
     }else{
       var lastSets=getLastSets(ex.name);
-      if(lastSets&&ex.name){h+='<div class="last-hint">Last: '+lastSets.map(function(s){return(s.w?s.w+'kg':'BW')+'x'+s.r;}).join(', ')+'</div>';}
-      h+='<div class="sets-hdr"><span>#</span><span>Weight kg</span><span>Reps</span><span></span></div>';
+      if(lastSets&&ex.name){
+        html+='<div style="font-size:11px;color:var(--text3);font-style:italic;padding:3px 2px;margin-bottom:6px">Last: '+lastSets.map(function(s){return(s.w?s.w+'kg':'BW')+'x'+s.r;}).join(', ')+'</div>';
+      }
+      html+='<div class="sets-hdr"><span>#</span><span>Weight kg</span><span>Reps</span><span></span></div>';
       ex.sets.forEach(function(s,j){
-        h+='<div class="sets-row"><span class="set-num">'+(j+1)+'</span>';
-        h+='<input class="sinp" type="number" placeholder="0" value="'+(s.w||'')+'" oninput="wEx['+i+'].sets['+j+'].w=Number(this.value)"/>';
-        h+='<input class="sinp" type="number" placeholder="0" value="'+(s.r||'')+'" oninput="wEx['+i+'].sets['+j+'].r=Number(this.value)"/>';
-        h+='<button class="btn-icon" style="padding:5px;font-size:11px" onclick="remSet('+i+','+j+')">&#x2715;</button></div>';
+        html+='<div class="sets-row">';
+        html+='<span class="set-num">'+(j+1)+'</span>';
+        html+='<input class="sinp" type="number" placeholder="0" value="'+(s.w||'')+'" oninput="wEx['+i+'].sets['+j+'].w=Number(this.value)"/>';
+        html+='<input class="sinp" type="number" placeholder="0" value="'+(s.r||'')+'" oninput="wEx['+i+'].sets['+j+'].r=Number(this.value)"/>';
+        html+='<button class="btn-icon" style="padding:5px" onclick="remSet('+i+','+j+')">&#x2715;</button>';
+        html+='</div>';
       });
-      h+='<button class="btn-sm" onclick="addSet('+i+')" style="margin-top:4px">+ Set</button>';
+      html+='<button class="btn-sm" onclick="addSet('+i+')" style="margin-top:4px">+ Set</button>';
     }
-    h+='</div>';
+    html+='</div>';
   });
-  c.innerHTML=h;
+  c.innerHTML=html;
 }
+
 function addEx(type){wEx.push({name:'',type:type,sets:[{w:'',r:''}]});renderExs();}
 function remEx(i){wEx.splice(i,1);renderExs();}
 function addSet(i){wEx[i].sets.push({w:'',r:''});renderExs();}
 function remSet(i,j){if(wEx[i].sets.length>1){wEx[i].sets.splice(j,1);renderExs();}}
+
 function saveWorkout(){
   var name=document.getElementById('wn').value.trim();
-  var date=document.getElementById('wd').value;
-  var dur=Number(document.getElementById('wt').value)||45;
-  if(!name){alert('Please enter a workout name');return;}
+  if(!name){alert('Please enter a name');return;}
   var exercises=[];
   for(var i=0;i<wEx.length;i++){
     var ex=wEx[i];
-    if(!ex.name.trim())continue;
+    if(!ex.name||!ex.name.trim())continue;
     if(ex.type==='cardio'){
       exercises.push({name:ex.name,type:'cardio',duration:ex.duration||0,cardioType:ex.cardioType||'',bpm:ex.bpm||0});
     }else{
@@ -539,19 +616,29 @@ function saveWorkout(){
       if(sets.length>0)exercises.push({name:ex.name.trim(),type:'strength',sets:sets});
     }
   }
-  if(exercises.length===0){alert('Please add at least one exercise with sets');return;}
-  var W=DB.get('workouts')||[];
-  var editId=editCtx&&editCtx.id?editCtx.id:null;
-  if(editId){
-    for(var k=0;k<W.length;k++){
-      if(W[k].id===editId){W[k]={id:editId,date:date,name:name,duration:dur,exercises:exercises};break;}
-    }
-  }else{
-    var newW={id:gid(),date:date,name:name,duration:dur,exercises:exercises};
-    W.unshift(newW);
+  if(exercises.length===0){alert('Please add at least one exercise');return;}
+
+  if(editCtx.type==='template'){
     var T=DB.get('templates')||[];
-    T.push({id:gid(),name:name,duration:dur,exercises:exercises});
+    if(editCtx.id){
+      T=T.map(function(t){return t.id===editCtx.id?{id:t.id,name:name,exercises:exercises}:t;});
+    }else{
+      T.push({id:gid(),name:name,exercises:exercises});
+    }
     DB.set('templates',T);
+    editCtx={};
+    cm('mo-workout');
+    renderPage();
+    return;
+  }
+
+  var date=document.getElementById('wd')?document.getElementById('wd').value:today();
+  var dur=document.getElementById('wt')?Number(document.getElementById('wt').value)||45:45;
+  var W=DB.get('workouts')||[];
+  if(editCtx.id){
+    W=W.map(function(w){return w.id===editCtx.id?{id:w.id,date:date,name:name,duration:dur,exercises:exercises}:w;});
+  }else{
+    W.unshift({id:gid(),date:date,name:name,duration:dur,exercises:exercises});
   }
   DB.set('workouts',W);
   editCtx={};
